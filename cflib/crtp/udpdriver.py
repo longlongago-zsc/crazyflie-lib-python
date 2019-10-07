@@ -29,7 +29,7 @@ See udpserver.py for the protocol"""
 import re
 import struct
 import sys
-from socket import socket
+from socket import *
 
 from .crtpdriver import CRTPDriver
 from .crtpstack import CRTPPacket
@@ -54,12 +54,12 @@ class UdpDriver(CRTPDriver):
             raise WrongUriType('Not an UDP URI')
 
         self.queue = queue.Queue()
-        self.socket = socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket = socket(AF_INET, SOCK_DGRAM)
         self.addr = ('192.168.4.1', 2390) #7777 modify @libo
         self.socket.connect(self.addr)
-
+        str1='\xFF\x01\x01\x01'
         # Add this to the server clients list
-        self.socket.sendto('\xFF\x01\x01\x01', self.addr)
+        self.socket.sendto(str1.encode("utf-8"), self.addr)
 
     def receive_packet(self, time=0):
         data, addr = self.socket.recvfrom(1024)
@@ -94,14 +94,16 @@ class UdpDriver(CRTPDriver):
         data = ''.join(chr(v) for v in (raw + (cksum,)))
 
         # print tuple(data)
-        self.socket.sendto(data, self.addr)
+        self.socket.sendto(data.encode("utf-8"), self.addr)
 
     def close(self):
+        str1='\xFF\x01\x01\x01'
         # Remove this from the server clients list
-        self.socket.sendto('\xFF\x01\x02\x02', self.addr)
+        self.socket.sendto(str1.encode("utf-8"), self.addr)
 
     def get_name(self):
         return 'udp'
 
     def scan_interface(self, address):
-        return []
+        address1 = 'udp://192.168.4.1'
+        return [[address1,'']]

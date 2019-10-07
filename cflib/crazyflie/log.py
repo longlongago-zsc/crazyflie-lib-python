@@ -108,7 +108,6 @@ logger = logging.getLogger(__name__)
 
 class LogVariable():
     """A logging variable"""
-
     TOC_TYPE = 0
     MEM_TYPE = 1
 
@@ -294,7 +293,7 @@ class LogConfig(object):
                     pk, expected_reply=(CMD_DELETE_BLOCK, self.id))
 
     def unpack_log_data(self, log_data, timestamp):
-        """Unpack received logging data so it represent real values according
+        """Unpack received logging data so it repreloggingsent real values according
         to the configuration in the entry"""
         ret_data = {}
         data_index = 0

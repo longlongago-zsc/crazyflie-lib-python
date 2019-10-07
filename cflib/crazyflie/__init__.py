@@ -55,7 +55,6 @@ from cflib.utils.callbacks import Caller
 
 __author__ = 'Bitcraze AB'
 __all__ = ['Crazyflie']
-
 logger = logging.getLogger(__name__)
 
 

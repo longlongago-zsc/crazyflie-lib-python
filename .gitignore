@@ -15,3 +15,4 @@ venv*
 
 #jekyll generated pages
 docs/.jekyll-metadata
+.idea/

@@ -27,17 +27,13 @@
 """ CRTP UDP Driver. Work either with the UDP server or with an UDP device
 See udpserver.py for the protocol"""
 import re
-import struct
-import sys
-from socket import socket
+import binascii
+import time
+from socket import *
 
 from .crtpdriver import CRTPDriver
 from .crtpstack import CRTPPacket
 from .exceptions import WrongUriType
-if sys.version_info < (3,):
-    import Queue as queue
-else:
-    import queue
 
 __author__ = 'Bitcraze AB'
 __all__ = ['UdpDriver']
@@ -46,6 +42,10 @@ __all__ = ['UdpDriver']
 class UdpDriver(CRTPDriver):
 
     def __init__(self):
+        self.debug = False
+        self.link_error_callback = None
+        self.link_quality_callback = None
+        self.needs_resending = True
         None
 
     def connect(self, uri, linkQualityCallback, linkErrorCallback):
@@ -53,55 +53,75 @@ class UdpDriver(CRTPDriver):
         if not re.search('^udp://', uri):
             raise WrongUriType('Not an UDP URI')
 
-        self.queue = queue.Queue()
-        self.socket = socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.addr = ('localhost', 7777)
+        self.socket = socket(AF_INET, SOCK_DGRAM)
+        self.addr = ('192.168.43.42', 2390) #The destination IP and port
+        self.socket.bind(('', 2399))
         self.socket.connect(self.addr)
-
+        str1=b'\xFF\x01\x01\x01'
         # Add this to the server clients list
-        self.socket.sendto('\xFF\x01\x01\x01', self.addr)
+        self.socket.sendto(str1, self.addr)
+        if self.debug:
+            print("Connected to UDP server")
+            print("send: {}".format(binascii.hexlify(bytearray(str1)))) 
 
     def receive_packet(self, time=0):
-        data, addr = self.socket.recvfrom(1024)
+        try:
+            data, addr = self.socket.recvfrom(1024)
+        except OSError:
+            if self.debug:
+                print("Socket error: socket might be closed.")
+            return None
 
         if data:
-            data = struct.unpack('b' * (len(data) - 1), data[0:len(data) - 1])
-            pk = CRTPPacket()
-            pk.port = data[0]
-            pk.data = data[1:]
-            return pk
+            # take the final byte as the checksum
+            cksum_recv = data[len(data)-1]
+            # remove the checksum from the data
+            data = data[0:(len(data)-1)]
+            # calculate checksum and check it with the last byte
+            cksum = 0
+            for i in data[0:]:
+                cksum += i
+            cksum %= 256
+            if cksum != cksum_recv:
+                if self.debug:
+                    print("Checksum error {} != {}".format(cksum, cksum_recv))
+                return None
 
-        try:
-            if time == 0:
-                return self.rxqueue.get(False)
-            elif time < 0:
-                while True:
-                    return self.rxqueue.get(True, 10)
-            else:
-                return self.rxqueue.get(True, time)
-        except queue.Empty:
+            pk = CRTPPacket(data[0], list(data[1:]))
+            # print the raw date
+            if self.debug:
+                print("recv: {}".format(binascii.hexlify(bytearray(data))))
+            return pk
+        else:
             return None
 
     def send_packet(self, pk):
-        raw = (pk.port,) + struct.unpack('B' * len(pk.data), pk.data)
-
+        raw = (pk.header,) + pk.datat
         cksum = 0
         for i in raw:
             cksum += i
-
         cksum %= 256
-
-        data = ''.join(chr(v) for v in (raw + (cksum,)))
-
-        # print tuple(data)
-        self.socket.sendto(data, self.addr)
+        raw = raw + (cksum,)
+        # change the tuple to bytes
+        raw = bytearray(raw)
+        self.socket.sendto(raw, self.addr)
+        # print the raw date
+        if self.debug:
+            print("send: {}".format(binascii.hexlify(raw)))
 
     def close(self):
+        str1=b'\xFF\x01\x01\x01'
         # Remove this from the server clients list
-        self.socket.sendto('\xFF\x01\x02\x02', self.addr)
+        self.socket.sendto(str1, self.addr)
+        if self.debug:
+            print("Disconnected from UDP server")
+            print("send: {}".format(binascii.hexlify(bytearray(str1))))
+        time.sleep(1)
+        self.socket.close()
 
     def get_name(self):
         return 'udp'
 
     def scan_interface(self, address):
-        return []
+        address1 = 'udp://192.168.43.42'
+        return [[address1,""]]

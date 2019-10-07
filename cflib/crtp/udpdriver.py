@@ -55,7 +55,7 @@ class UdpDriver(CRTPDriver):
 
         self.queue = queue.Queue()
         self.socket = socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.addr = ('localhost', 7777)
+        self.addr = ('192.168.4.1', 2390) #7777 modify @libo
         self.socket.connect(self.addr)
 
         # Add this to the server clients list
@@ -67,7 +67,7 @@ class UdpDriver(CRTPDriver):
         if data:
             data = struct.unpack('b' * (len(data) - 1), data[0:len(data) - 1])
             pk = CRTPPacket()
-            pk.port = data[0]
+            pk.header = data[0] #modify port @libo
             pk.data = data[1:]
             return pk
 
@@ -83,7 +83,7 @@ class UdpDriver(CRTPDriver):
             return None
 
     def send_packet(self, pk):
-        raw = (pk.port,) + struct.unpack('B' * len(pk.data), pk.data)
+        raw = (pk.header,) + struct.unpack('B' * len(pk.data), pk.data)#modify @libo
 
         cksum = 0
         for i in raw:

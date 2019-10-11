@@ -116,6 +116,7 @@ class PlatformService():
                 pk.data = (VERSION_GET_PROTOCOL, )
                 self._cf.send_packet(pk)
             else:
+                print(pk.data[:18].decode('utf8'))
                 self._protocolVersion = -1
                 logger.info('Procotol version: {}'.format(
                     self.get_protocol_version()))

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 #
 #     ||          ____  _ __
 #  +------+      / __ )(_) /_______________ _____  ___
@@ -160,23 +160,20 @@ def run_sequence(cf, trajectory_id, duration):
     commander.takeoff(1.0, 2.0)
     time.sleep(3.0)
     relative = True
-    commander.start_trajectory(trajectory_id, 1.0, relative)
+    #commander.start_trajectory(trajectory_id, 1.0, relative)
     time.sleep(duration)
     commander.land(0.0, 2.0)
     time.sleep(2)
     commander.stop()
 
-
 if __name__ == '__main__':
     cflib.crtp.init_drivers(enable_debug_driver=False)
+    cf=Crazyflie(uri)
+    trajectory_id = 1
 
-    with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
-        cf = scf.cf
-        trajectory_id = 1
-
-        activate_high_level_commander(cf)
-        # activate_mellinger_controller(cf)
-        duration = upload_trajectory(cf, trajectory_id, figure8)
-        print('The sequence is {:.1f} seconds long'.format(duration))
-        reset_estimator(cf)
-        run_sequence(cf, trajectory_id, duration)
+    #activate_high_level_commander(cf)
+    # activate_mellinger_controller(cf)
+    #duration = upload_trajectory(cf, trajectory_id, figure8)
+    #print('The sequence is {:.1f} seconds long'.format(duration))
+    #reset_estimator(cf)
+    run_sequence(cf, trajectory_id, 1)

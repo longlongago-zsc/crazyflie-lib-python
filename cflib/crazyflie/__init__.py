@@ -55,7 +55,7 @@ from cflib.utils.callbacks import Caller
 
 __author__ = 'Bitcraze AB'
 __all__ = ['Crazyflie']
-
+logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 

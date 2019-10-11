@@ -29,6 +29,7 @@ See udpserver.py for the protocol"""
 import re
 import struct
 import sys
+import binascii
 from socket import *
 
 from .crtpdriver import CRTPDriver
@@ -56,19 +57,22 @@ class UdpDriver(CRTPDriver):
         self.queue = queue.Queue()
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.addr = ('192.168.4.1', 2390) #7777 modify @libo
+        self.socket.bind(('', 2399))
         self.socket.connect(self.addr)
-        str1='\xFF\x01\x01\x01'
+        str1=b'\xFF\x01\x01\x01'
         # Add this to the server clients list
-        self.socket.sendto(str1.encode("utf-8"), self.addr)
+        self.socket.sendto(str1,self.addr)
+        print(str1)
 
     def receive_packet(self, time=0):
         data, addr = self.socket.recvfrom(1024)
-
         if data:
-            data = struct.unpack('b' * (len(data) - 1), data[0:len(data) - 1])
-            pk = CRTPPacket()
-            pk.header = data[0] #modify port @libo
-            pk.data = data[1:]
+            pk = CRTPPacket(data[0], list(data[1:(len(data)-1)]))
+            # data = struct.unpack('B' * (len(data) - 1), data[0:len(data) - 1])#modify @libo
+            # pk = CRTPPacket()
+            # pk.header = data[0] #modify port @libo
+            # pk.data = data[1:]
+            print(data)
             return pk
 
         try:
@@ -83,27 +87,26 @@ class UdpDriver(CRTPDriver):
             return None
 
     def send_packet(self, pk):
-        raw = (pk.header,) + struct.unpack('B' * len(pk.data), pk.data)#modify @libo
-
+        #raw = (pk.header,) + struct.unpack('B' * len(pk.data), pk.data)#modify @libo
+        raw = (pk.header,) + pk.datat
         cksum = 0
         for i in raw:
             cksum += i
-
         cksum %= 256
-
-        data = ''.join(chr(v) for v in (raw + (cksum,)))
-
-        # print tuple(data)
-        self.socket.sendto(data.encode("utf-8"), self.addr)
+        raw = raw + (cksum,)
+        data = ''.join(chr(v) for v in raw )
+        self.socket.sendto(data.encode('latin'), self.addr)
+        print(data.encode('latin'))
 
     def close(self):
-        str1='\xFF\x01\x01\x01'
+        str1=b'\xFF\x01\x01\x01'
         # Remove this from the server clients list
-        self.socket.sendto(str1.encode("utf-8"), self.addr)
+        self.socket.sendto(str1, self.addr)
+        self.socket.close()
 
     def get_name(self):
         return 'udp'
 
     def scan_interface(self, address):
         address1 = 'udp://192.168.4.1'
-        return [[address1,'']]
+        return [[address1,]]

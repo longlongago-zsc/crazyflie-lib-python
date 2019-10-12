@@ -2,17 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="17bfb71e-574e-45a6-9b4d-3e5594429b43" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/examples/test.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/crazyflie-lib-python.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/crazyflie-lib-python.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cflib/crazyflie/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/cflib/crazyflie/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cflib/crazyflie/log.py" beforeDir="false" afterPath="$PROJECT_DIR$/cflib/crazyflie/log.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cflib/crazyflie/platformservice.py" beforeDir="false" afterPath="$PROJECT_DIR$/cflib/crazyflie/platformservice.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cflib/crtp/udpdriver.py" beforeDir="false" afterPath="$PROJECT_DIR$/cflib/crtp/udpdriver.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/autonomous_sequence_high_level.py" beforeDir="false" afterPath="$PROJECT_DIR$/examples/autonomous_sequence_high_level.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/basiclog.py" beforeDir="false" afterPath="$PROJECT_DIR$/examples/basiclog.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -58,7 +49,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.basiclog">
+  <component name="RunManager" selected="Python.basicparam">
     <configuration name="autonomous_sequence_high_level" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="crazyflie-lib-python" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -93,6 +84,27 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/examples/basiclog.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="basicparam" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="crazyflie-lib-python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/examples" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/examples/basicparam.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -145,6 +157,7 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.basicparam" />
         <item itemvalue="Python.basiclog" />
         <item itemvalue="Python.scan" />
         <item itemvalue="Python.test" />

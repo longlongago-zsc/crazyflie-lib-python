@@ -47,6 +47,12 @@ __all__ = ['UdpDriver']
 class UdpDriver(CRTPDriver):
 
     def __init__(self):
+        self.link_error_callback = None
+        self.link_quality_callback = None
+        self.in_queue = None
+        self.out_queue = None
+        self._thread = None
+        self.needs_resending = False
         None
 
     def connect(self, uri, linkQualityCallback, linkErrorCallback):
@@ -72,6 +78,7 @@ class UdpDriver(CRTPDriver):
             # pk = CRTPPacket()
             # pk.header = data[0] #modify port @libo
             # pk.data = data[1:]
+            print("recv: ")
             print(data)
             return pk
 
@@ -96,6 +103,7 @@ class UdpDriver(CRTPDriver):
         raw = raw + (cksum,)
         data = ''.join(chr(v) for v in raw )
         self.socket.sendto(data.encode('latin'), self.addr)
+        print("send: ")
         print(data.encode('latin'))
 
     def close(self):
@@ -109,4 +117,4 @@ class UdpDriver(CRTPDriver):
 
     def scan_interface(self, address):
         address1 = 'udp://192.168.4.1'
-        return [[address1,]]
+        return [[address1,""]]

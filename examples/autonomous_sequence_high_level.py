@@ -132,7 +132,7 @@ def activate_high_level_commander(cf):
 
 
 def activate_mellinger_controller(cf):
-    cf.param.set_value('stabilizer.controller', '2')
+    cf.param.set_value('stabilizer.controller', '1')
 
 
 def upload_trajectory(cf, trajectory_id, trajectory):

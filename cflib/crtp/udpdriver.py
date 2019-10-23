@@ -68,7 +68,7 @@ class UdpDriver(CRTPDriver):
         str1=b'\xFF\x01\x01\x01'
         # Add this to the server clients list
         self.socket.sendto(str1,self.addr)
-        print(str1)
+        #print(str1)
 
     def receive_packet(self, time=0):
         data, addr = self.socket.recvfrom(1024)
@@ -78,8 +78,8 @@ class UdpDriver(CRTPDriver):
             # pk = CRTPPacket()
             # pk.header = data[0] #modify port @libo
             # pk.data = data[1:]
-            print("recv: ")
-            print(data)
+            #print("recv: ")
+            #print(data)
             return pk
 
         try:
@@ -103,8 +103,8 @@ class UdpDriver(CRTPDriver):
         raw = raw + (cksum,)
         data = ''.join(chr(v) for v in raw )
         self.socket.sendto(data.encode('latin'), self.addr)
-        print("send: ")
-        print(data.encode('latin'))
+        #print("send: ")
+        #print(data.encode('latin'))
 
     def close(self):
         str1=b'\xFF\x01\x01\x01'

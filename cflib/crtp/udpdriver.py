@@ -116,5 +116,5 @@ class UdpDriver(CRTPDriver):
         return 'udp'
 
     def scan_interface(self, address):
-        address1 = 'udp://192.168.4.1'
+        address1 = 'udp://192.168.43.42'
         return [[address1,""]]

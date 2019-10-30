@@ -5,7 +5,6 @@
       <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cflib/crtp/udpdriver.py" beforeDir="false" afterPath="$PROJECT_DIR$/cflib/crtp/udpdriver.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/autonomous_sequence_high_level.py" beforeDir="false" afterPath="$PROJECT_DIR$/examples/autonomous_sequence_high_level.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -36,7 +35,7 @@
   <component name="ProjectId" id="1Ru1iaVtx2YrKgZ94H9dPxkslic" />
   <component name="PropertiesComponent">
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../crazyflie-clients-python" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="settings.editor.selected.configurable" value="preferences.customizations" />
   </component>
   <component name="RunDashboard">

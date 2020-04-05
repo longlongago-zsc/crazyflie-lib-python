@@ -40,7 +40,7 @@ __all__ = []
 logger = logging.getLogger(__name__)
 
 
-DRIVERS = [RadioDriver, SerialDriver, UdpDriver, DebugDriver, UsbDriver]
+DRIVERS = [UdpDriver]
 CLASSES = []
 
 

@@ -15,3 +15,6 @@ venv*
 
 #jekyll generated pages
 docs/.jekyll-metadata
+.idea/crazyflie-lib-python.iml
+.idea/misc.xml
+.idea/workspace.xml

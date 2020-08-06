@@ -53,6 +53,7 @@ class UdpDriver(CRTPDriver):
         self.out_queue = None
         self._thread = None
         self.needs_resending = False
+        self.link_keep_alive = 0 #keep alive when no input device
         None
 
     def connect(self, uri, linkQualityCallback, linkErrorCallback):
@@ -74,6 +75,11 @@ class UdpDriver(CRTPDriver):
         data, addr = self.socket.recvfrom(1024)
         if data:
             pk = CRTPPacket(data[0], list(data[1:(len(data)-1)]))
+            self.link_keep_alive += 1
+            if self.link_keep_alive > 10:
+                str1 = b'\xFF\x01\x01\x01'
+                self.socket.sendto(str1, self.addr)
+                self.link_keep_alive = 0
             # data = struct.unpack('B' * (len(data) - 1), data[0:len(data) - 1])#modify @libo
             # pk = CRTPPacket()
             # pk.header = data[0] #modify port @libo
@@ -103,6 +109,7 @@ class UdpDriver(CRTPDriver):
         raw = raw + (cksum,)
         data = ''.join(chr(v) for v in raw )
         self.socket.sendto(data.encode('latin'), self.addr)
+        self.link_keep_alive = 0
         #print("send: ")
         #print(data.encode('latin'))
 

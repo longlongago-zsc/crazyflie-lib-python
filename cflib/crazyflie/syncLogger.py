@@ -6,7 +6,7 @@
 #  +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
 #   ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
 #
-#  Copyright (C) 2016 Bitcraze AB
+#  Copyright (C) 2016-2020 Bitcraze AB
 #
 #  Crazyflie Nano Quadcopter Client
 #
@@ -19,24 +19,17 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 This class provides synchronous access to log data from the Crazyflie.
 
 It acts as an iterator and returns the next value on each iteration.
-If no value is available it blocks until log data is available again.
+If no value is available it blocks until log data is received again.
 """
-import sys
+from queue import Queue
 
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
-
-if sys.version_info < (3,):
-    from Queue import Queue
-else:
-    from queue import Queue
 
 
 class SyncLogger:
@@ -46,15 +39,18 @@ class SyncLogger:
         """
         Construct an instance of a SyncLogger
 
-        Takes an Crazyflie or SyncCrazyflie instance and a log configuration
+        Takes an Crazyflie or SyncCrazyflie instance and one log configuration
+        or an array of log configurations
         """
         if isinstance(crazyflie, SyncCrazyflie):
             self._cf = crazyflie.cf
         else:
             self._cf = crazyflie
 
-        self._log_config = log_config
-        self._cf.log.add_config(self._log_config)
+        if isinstance(log_config, list):
+            self._log_config = log_config
+        else:
+            self._log_config = [log_config]
 
         self._queue = Queue()
 
@@ -65,21 +61,23 @@ class SyncLogger:
             raise Exception('Already connected')
 
         self._cf.disconnected.add_callback(self._disconnected)
-        self._log_config.data_received_cb.add_callback(self._log_callback)
-        self._log_config.start()
+        for config in self._log_config:
+            self._cf.log.add_config(config)
+            config.data_received_cb.add_callback(self._log_callback)
+            config.start()
 
         self._is_connected = True
 
     def disconnect(self):
         if self._is_connected:
-            self._log_config.stop()
-            self._log_config.delete()
+            for config in self._log_config:
+                config.stop()
+                config.delete()
 
-            self._log_config.data_received_cb.remove_callback(
-                self._log_callback)
+                config.data_received_cb.remove_callback(
+                    self._log_callback)
+
             self._cf.disconnected.remove_callback(self._disconnected)
-
-            self._queue.empty()
 
             self._is_connected = False
 
@@ -99,6 +97,7 @@ class SyncLogger:
         data = self._queue.get()
 
         if data == self.DISCONNECT_EVENT:
+            self._queue.empty()
             raise StopIteration
 
         return data
@@ -109,10 +108,11 @@ class SyncLogger:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.disconnect()
+        self._queue.empty()
 
     def _log_callback(self, ts, data, logblock):
         self._queue.put((ts, data, logblock))
 
     def _disconnected(self, link_uri):
-        self._queue.put(self.DISCONNECT_EVENT)
         self.disconnect()
+        self._queue.put(self.DISCONNECT_EVENT)

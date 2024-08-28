@@ -20,10 +20,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Bootloading utilities for the Crazyflie.
 """
@@ -81,6 +79,7 @@ class Target:
         self.buffer_pages = 0
         self.flash_pages = 0
         self.start_page = 0
+        self.version = None
         self.cpuid = ''
         self.data = None
 
@@ -88,9 +87,9 @@ class Target:
         ret = ''
         ret += 'Target info: {} (0x{:X})\n'.format(
             TargetTypes.to_string(self.id), self.id)
-        ret += 'Flash pages: %d | Page size: %d | Buffer pages: %d |' \
-               ' Start page: %d\n' % (self.flash_pages, self.page_size,
-                                      self.buffer_pages, self.start_page)
+        ret += 'Flash pages: {} | Page size: {} | Buffer pages: {} |' \
+               ' Start page: {} | Version: {} \n'.format(self.flash_pages, self.page_size,
+                                                         self.buffer_pages, self.start_page, self.version)
         ret += '%d KBytes of flash available for firmware image.' % (
             (self.flash_pages - self.start_page) * self.page_size / 1024)
         return ret

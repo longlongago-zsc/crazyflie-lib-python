@@ -19,10 +19,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Simple example that connects to the crazyflie at `URI` and writes to
 the LED memory so that individual leds in the LED-ring can be set,
@@ -37,16 +35,17 @@ import cflib.crtp
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.mem import MemoryElement
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
+from cflib.utils import uri_helper
 
-URI = 'radio://0/80/250K'
+URI = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
 
 # Only output errors from the logging framework
 logging.basicConfig(level=logging.ERROR)
 
 
 if __name__ == '__main__':
-    # Initialize the low-level drivers (don't list the debug drivers)
-    cflib.crtp.init_drivers(enable_debug_driver=False)
+    # Initialize the low-level drivers
+    cflib.crtp.init_drivers()
 
     with SyncCrazyflie(URI, cf=Crazyflie(rw_cache='./cache')) as scf:
         cf = scf.cf
@@ -57,9 +56,9 @@ if __name__ == '__main__':
         # Get LED memory and write to it
         mem = cf.mem.get_mems(MemoryElement.TYPE_DRIVER_LED)
         if len(mem) > 0:
-            mem[0].leds[0].set(r=0,   g=100, b=0)
-            mem[0].leds[3].set(r=0,   g=0,   b=100)
-            mem[0].leds[6].set(r=100, g=0,   b=0)
+            mem[0].leds[0].set(r=0, g=100, b=0)
+            mem[0].leds[3].set(r=0, g=0, b=100)
+            mem[0].leds[6].set(r=100, g=0, b=0)
             mem[0].leds[9].set(r=100, g=100, b=100)
             mem[0].write_data(None)
 

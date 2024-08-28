@@ -20,10 +20,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Crazyflie console is used to receive characters printed using printf
 from the firmware.
@@ -47,11 +45,27 @@ class Console:
         """
 
         self.receivedChar = Caller()
+        """
+        This member variable is used to setup a callback that will be called
+        when text is received from the CONSOLE port of CRTP (0).
+
+        Example:
+        ```python
+        [...]
+
+        def log_console(self, text):
+            self.log_file.write(text)
+
+        [...]
+
+        self.cf.console.receivedChar.add_callback(self.log_console)
+        ```
+        """
 
         self.cf = crazyflie
-        self.cf.add_port_callback(CRTPPort.CONSOLE, self.incoming)
+        self.cf.add_port_callback(CRTPPort.CONSOLE, self._incoming)
 
-    def incoming(self, packet):
+    def _incoming(self, packet):
         """
         Callback for data received from the copter.
         """

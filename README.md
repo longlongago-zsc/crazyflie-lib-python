@@ -1,35 +1,23 @@
-# cflib for esp-drone
+# cflib: Crazyflie python library [![CI](https://github.com/bitcraze/crazyflie-lib-python/workflows/CI/badge.svg)](https://github.com/bitcraze/crazyflie-lib-python/actions)
 
-[cflib](./ORIGIN.md) is an API written in Python that is used to communicate with the Crazyflie
-and Crazyflie 2.0 quadcopters.
+cflib is an API written in Python that is used to communicate with the Crazyflie
+and Crazyflie 2.0 quadcopters. It is intended to be used by client software to
+communicate with and control a Crazyflie quadcopter. For instance the [Crazyflie PC client](https://www.github.com/bitcraze/crazyflie-clients-python)  uses the cflib.
 
-In this fork, the cflib is used to communicate with the [esp-drone](https://github.com/espressif/esp-drone) through the WiFi connection and UDP protocol.
+See [below](#platform-notes) for platform specific instruction.
+For more info see our [documentation](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/).
 
-## Using the modified cflib for esp-drone
+## Installation
+See the [installation instructions](docs/installation/install.md) in the github docs folder.
 
-To install the modified cflib for esp-drone, you can follow the instructions below.
+## Official Documentation
 
-```bash
-  pip install git+https://github.com/leeebo/crazyflie-lib-python.git
-```
-## Using the GUI tools for esp-drone
+Check out the [Bitcraze crazyflie-lib-python documentation](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/) on our website.
 
-The folked version of the [cfclient](https://github.com/leeebo/crazyflie-clients-python) can be used to communicate with the esp-drone.
+## Contribute
+Go to the [contribute page](https://www.bitcraze.io/contribute/) on our website to learn more.
 
-## Development
+### Test code for contribution
+Run the automated build locally to test your code
 
-If you want to develop features or fix bugs in the cflib, you can follow the instructions below.
-
-* [Fork the cflib](https://help.github.com/articles/fork-a-repo/), [click](https://github.com/leeebo/crazyflie-lib-python/fork) to fork
-* [Clone the cflib](https://help.github.com/articles/cloning-a-repository/) please replace `leeebo` with your GitHub username.
-
-```bash
-  git clone https://github.com/leeebo/crazyflie-lib-python.git
-```
-
-* [Install the cflib in editable mode](http://pip-python3.readthedocs.org/en/latest/reference/pip_install.html?highlight=editable#editable-installs)
-
-```bash
-  pip install -e path/to/cflib
-```
-
+	python3 tools/build/build

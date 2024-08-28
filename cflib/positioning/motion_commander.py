@@ -17,10 +17,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 The MotionCommander is used to make it easy to write scripts that moves the
 Crazyflie around. Some sort of positioning support is required, for instance
@@ -42,16 +40,12 @@ this mode of operation takeoff and landing is executed when the context is
 created/closed.
 """
 import math
-import sys
 import time
+from queue import Empty
+from queue import Queue
 from threading import Thread
 
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
-
-if sys.version_info < (3,):
-    from Queue import Queue, Empty
-else:
-    from queue import Queue, Empty
 
 
 class MotionCommander:
@@ -63,8 +57,8 @@ class MotionCommander:
         """
         Construct an instance of a MotionCommander
 
-        :param crazyflie: a Crazyflie or SyncCrazyflie instance
-        :param default_height: the default height to fly at
+        :param crazyflie: A Crazyflie or SyncCrazyflie instance
+        :param default_height: The default height to fly at
         """
         if isinstance(crazyflie, SyncCrazyflie):
             self._cf = crazyflie.cf
@@ -80,13 +74,13 @@ class MotionCommander:
 
     def take_off(self, height=None, velocity=VELOCITY):
         """
-        Takes off, that is starts the motors, goes straigt up and hovers.
+        Takes off, that is starts the motors, goes straight up and hovers.
         Do not call this function if you use the with keyword. Take off is
         done automatically when the context is created.
 
-        :param height: the height (meters) to hover at. None uses the default
+        :param height: The height (meters) to hover at. None uses the default
                        height set when constructed.
-        :param velocity: the velocity (meters/second) when taking off
+        :param velocity: The velocity (meters/second) when taking off
         :return:
         """
         if self._is_flying:
@@ -123,6 +117,9 @@ class MotionCommander:
             self._thread = None
 
             self._cf.commander.send_stop_setpoint()
+            # Stop using low level setpoints and hand responsibility over to the high level commander to
+            # avoid time out when no setpoints are received any more
+            self._cf.commander.send_notify_setpoint_stop()
             self._is_flying = False
 
     def __enter__(self):
@@ -136,8 +133,8 @@ class MotionCommander:
         """
         Go left
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(0.0, distance_m, 0.0, velocity)
@@ -146,8 +143,8 @@ class MotionCommander:
         """
         Go right
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(0.0, -distance_m, 0.0, velocity)
@@ -156,8 +153,8 @@ class MotionCommander:
         """
         Go forward
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(distance_m, 0.0, 0.0, velocity)
@@ -166,8 +163,8 @@ class MotionCommander:
         """
         Go backwards
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(-distance_m, 0.0, 0.0, velocity)
@@ -176,8 +173,8 @@ class MotionCommander:
         """
         Go up
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(0.0, 0.0, distance_m, velocity)
@@ -186,8 +183,8 @@ class MotionCommander:
         """
         Go down
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(0.0, 0.0, -distance_m, velocity)
@@ -197,7 +194,7 @@ class MotionCommander:
         Turn to the left, staying on the spot
 
         :param angle_degrees: How far to turn (degrees)
-        :param rate: The trurning speed (degrees/second)
+        :param rate: The turning speed (degrees/second)
         :return:
         """
         flight_time = angle_degrees / rate
@@ -211,7 +208,7 @@ class MotionCommander:
         Turn to the right, staying on the spot
 
         :param angle_degrees: How far to turn (degrees)
-        :param rate: The trurning speed (degrees/second)
+        :param rate: The turning speed (degrees/second)
         :return:
         """
         flight_time = angle_degrees / rate
@@ -263,7 +260,7 @@ class MotionCommander:
         :param distance_x_m: The distance to travel along the X-axis (meters)
         :param distance_y_m: The distance to travel along the Y-axis (meters)
         :param distance_z_m: The distance to travel along the Z-axis (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         distance = math.sqrt(distance_x_m * distance_x_m +
@@ -387,9 +384,9 @@ class MotionCommander:
 
         self._set_vel_setpoint(velocity, 0.0, 0.0, rate)
 
-    def start_linear_motion(self, velocity_x_m, velocity_y_m, velocity_z_m):
+    def start_linear_motion(self, velocity_x_m, velocity_y_m, velocity_z_m, rate_yaw=0.0):
         """
-        Start a linear motion. This function returns immediately.
+        Start a linear motion with an optional yaw rate input. This function returns immediately.
 
         positive X is forward
         positive Y is left
@@ -398,10 +395,11 @@ class MotionCommander:
         :param velocity_x_m: The velocity along the X-axis (meters/second)
         :param velocity_y_m: The velocity along the Y-axis (meters/second)
         :param velocity_z_m: The velocity along the Z-axis (meters/second)
+        :param rate: The angular rate (degrees/second)
         :return:
         """
         self._set_vel_setpoint(
-            velocity_x_m, velocity_y_m, velocity_z_m, 0.0)
+            velocity_x_m, velocity_y_m, velocity_z_m, rate_yaw)
 
     def _set_vel_setpoint(self, velocity_x, velocity_y, velocity_z, rate_yaw):
         if not self._is_flying:

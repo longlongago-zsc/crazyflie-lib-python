@@ -20,28 +20,22 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Crazyflie USB driver.
 
 This driver is used to communicate with the Crazyflie using the USB connection.
 """
 import logging
+import queue
 import re
-import sys
 import threading
 
 from .crtpstack import CRTPPacket
 from .exceptions import WrongUriType
 from cflib.crtp.crtpdriver import CRTPDriver
 from cflib.drivers.cfusb import CfUsb
-if sys.version_info < (3,):
-    import Queue as queue
-else:
-    import queue
 
 __author__ = 'Bitcraze AB'
 __all__ = ['UsbDriver']
@@ -71,21 +65,20 @@ class UsbDriver(CRTPDriver):
 
         The callback for linkQuality can be called at any moment from the
         driver to report back the link quality in percentage. The
-        callback from linkError will be called when a error occues with
+        callback from linkError will be called when a error occurs with
         an error message.
         """
 
         # check if the URI is a radio URI
-        if not re.search('^usb://', uri):
+        uri_data = re.search('^usb://([0-9]+)$',
+                             uri)
+        if not uri_data:
             raise WrongUriType('Not a radio URI')
 
         # Open the USB dongle
         if not re.search('^usb://([0-9]+)$',
                          uri):
             raise WrongUriType('Wrong radio URI format!')
-
-        uri_data = re.search('^usb://([0-9]+)$',
-                             uri)
 
         self.uri = uri
 
@@ -214,8 +207,6 @@ class _UsbReceiveThread(threading.Thread):
     """
     Radio link receiver thread used to read data from the
     Crazyradio USB driver. """
-
-    # RETRYCOUNT_BEFORE_DISCONNECT = 10
 
     def __init__(self, cfusb, inQueue, link_quality_callback,
                  link_error_callback):

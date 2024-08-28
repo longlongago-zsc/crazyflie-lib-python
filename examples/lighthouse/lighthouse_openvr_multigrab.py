@@ -15,8 +15,8 @@ from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie.syncLogger import SyncLogger
 
 # URI to the Crazyflie to connect to
-uri0 = 'radio://0/80/2M'
-uri1 = 'radio://0/80/2M/E7E7E7E701'
+uri0 = 'radio://0/80/2M/E7E7E7E701'
+uri1 = 'radio://0/80/2M/E7E7E7E702'
 
 print('Opening')
 vr = openvr.init(openvr.VRApplication_Other)
@@ -107,7 +107,7 @@ def start_position_printing(scf):
     log_conf.start()
 
 
-def vector_substract(v0, v1):
+def vector_subtract(v0, v1):
     return [v0[0] - v1[0], v0[1] - v1[1], v0[2] - v1[2]]
 
 
@@ -127,8 +127,8 @@ def run_sequence(scf0, scf1):
         openvr.TrackingUniverseStanding, 0, openvr.k_unMaxTrackedDeviceCount)
     controller_pose = poses[controllerId]
     pose = controller_pose.mDeviceToAbsoluteTracking
-    setpoints = [[-1*pose[2][3], -1*pose[0][3] - 0.5, pose[1][3] + 0.3],
-                 [-1*pose[2][3], -1*pose[0][3] + 0.5, pose[1][3] + 0.3]]
+    setpoints = [[-1 * pose[2][3], -1 * pose[0][3] - 0.5, pose[1][3] + 0.3],
+                 [-1 * pose[2][3], -1 * pose[0][3] + 0.5, pose[1][3] + 0.3]]
 
     closest = 0
 
@@ -149,12 +149,12 @@ def run_sequence(scf0, scf1):
 
         if not grabbed and trigger:
             print('Grab started')
-            grab_controller_start = [-1*pose[2][3], -1*pose[0][3], pose[1][3]]
+            grab_controller_start = [-1 * pose[2][3], -1 * pose[0][3], pose[1][3]]
 
-            dist0 = vector_norm(vector_substract(grab_controller_start,
-                                                 setpoints[0]))
-            dist1 = vector_norm(vector_substract(grab_controller_start,
-                                                 setpoints[1]))
+            dist0 = vector_norm(vector_subtract(grab_controller_start,
+                                                setpoints[0]))
+            dist1 = vector_norm(vector_subtract(grab_controller_start,
+                                                setpoints[1]))
 
             if dist0 < dist1:
                 closest = 0
@@ -169,10 +169,10 @@ def run_sequence(scf0, scf1):
         grabbed = trigger
 
         if trigger:
-            curr = [-1*pose[2][3], -1*pose[0][3], pose[1][3]]
+            curr = [-1 * pose[2][3], -1 * pose[0][3], pose[1][3]]
             setpoints[closest] = vector_add(
-                grab_setpoint_start, vector_substract(curr,
-                                                      grab_controller_start))
+                grab_setpoint_start, vector_subtract(curr,
+                                                     grab_controller_start))
 
         cf0.commander.send_position_setpoint(setpoints[0][0],
                                              setpoints[0][1],
@@ -193,7 +193,7 @@ def run_sequence(scf0, scf1):
 
 
 if __name__ == '__main__':
-    cflib.crtp.init_drivers(enable_debug_driver=False)
+    cflib.crtp.init_drivers()
 
     with SyncCrazyflie(uri0, cf=Crazyflie(rw_cache='./cache')) as scf0:
         reset_estimator(scf0)

@@ -20,17 +20,17 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """Scans and creates communication interfaces."""
 import logging
+import os
 
-from .debugdriver import DebugDriver
 from .exceptions import WrongUriType
+from .prrtdriver import PrrtDriver
 from .radiodriver import RadioDriver
 from .serialdriver import SerialDriver
+from .tcpdriver import TcpDriver
 from .udpdriver import UdpDriver
 from .usbdriver import UsbDriver
 
@@ -40,18 +40,26 @@ __all__ = []
 logger = logging.getLogger(__name__)
 
 
-DRIVERS = [UdpDriver] #currently support only udp
 CLASSES = []
 
 
-def init_drivers(enable_debug_driver=False):
+def init_drivers(enable_debug_driver=False, enable_serial_driver=False):
     """Initialize all the drivers."""
-    for driver in DRIVERS:
-        try:
-            if driver != DebugDriver or enable_debug_driver:
-                CLASSES.append(driver)
-        except Exception:  # pylint: disable=W0703
-            continue
+    '''
+    env = os.getenv('USE_CFLINK')
+    if env is not None and env == 'cpp':
+        from .cflinkcppdriver import CfLinkCppDriver
+        CLASSES.append(CfLinkCppDriver)
+    else:
+        CLASSES.extend([RadioDriver, UsbDriver])
+
+    if enable_debug_driver:
+        logger.warn('The debug driver is no longer supported!')
+
+    if enable_serial_driver:
+        CLASSES.append(SerialDriver)
+    '''
+    CLASSES.extend([UdpDriver])
 
 
 def scan_interfaces(address=None):

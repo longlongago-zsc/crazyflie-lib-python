@@ -20,10 +20,9 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+# flake8: noqa
 """
 Enables logging of variables from the Crazyflie.
 
@@ -32,33 +31,23 @@ the variables that can be logged. Using this it's possible to add logging
 configurations where selected variables are sent to the client at a
 specified period.
 
-Terminology:
-  Log configuration - A configuration with a period and a number of variables
-                      that are present in the TOC.
-  Stored as         - The size and type of the variable as declared in the
-                      Crazyflie firmware
-  Fetch as          - The size and type that a variable should be fetched as.
-                      This does not have to be the same as the size and type
-                      it's stored as.
+#### Terminology
 
-States of a configuration:
-  Created on host - When a configuration is created the contents is checked
-                    so that all the variables are present in the TOC. If not
-                    then the configuration cannot be created.
-  Created on CF   - When the configuration is deemed valid it is added to the
-                    Crazyflie. At this time the memory constraint is checked
-                    and the status returned.
-  Started on CF   - Any added block that is not started can be started. Once
-                    started the Crazyflie will send back logdata periodically
-                    according to the specified period when it's created.
-  Stopped on CF   - Any started configuration can be stopped. The memory taken
-                    by the configuration on the Crazyflie is NOT freed, the
-                    only effect is that the Crazyflie will stop sending
-                    logdata back to the host.
-  Deleted on CF   - Any block that is added can be deleted. When this is done
-                    the memory taken by the configuration is freed on the
-                    Crazyflie. The configuration will have to be re-added to
-                    be used again.
+| Term              | Description |
+| ----------------- | ----------- |
+| <nobr>Log configuration</nobr> | A configuration with a period and a number of variables that are present in the TOC. |
+| Stored as         | The size and type of the variable as declared in the Crazyflie firmware. |
+| Fetch as          | The size and type that a variable should be fetched as. This does not have to be the same as the size and type it's stored as. |
+
+#### States of a configuration
+
+| State             | Description |
+| ----------------- | ----------- |
+| <nobr>Created on host</nobr> | When a configuration is created the contents is checked so that all the variables are present in the TOC. If not then the configuration cannot be created. |
+| <nobr>Created on CF</nobr>   | When the configuration is deemed valid it is added to the Crazyflie. At this time the memory constraint is checked and the status returned. |
+| <nobr>Started on CF</nobr>   | Any added block that is not started can be started. Once started the Crazyflie will send back logdata periodically according to the specified period when it's created. |
+| <nobr>Stopped on CF</nobr>   | Any started configuration can be stopped. The memory taken by the configuration on the Crazyflie is NOT freed, the only effect is that the Crazyflie will stop sending logdata back to the host. |
+| <nobr>Deleted on CF</nobr>   | Any block that is added can be deleted. When this is done the memory taken by the configuration is freed on the Crazyflie. The configuration will have to be re-added to be used again. |
 """
 import errno
 import logging
@@ -99,15 +88,14 @@ IDLE = 'IDLE'
 GET_TOC_INF = 'GET_TOC_INFO'
 GET_TOC_ELEMENT = 'GET_TOC_ELEMENT'
 
-# The max size of a CRTP packet payload
-MAX_LOG_DATA_PACKET_SIZE = 30
-
 
 logger = logging.getLogger(__name__)
 
 
 class LogVariable():
     """A logging variable"""
+
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     TOC_TYPE = 0
     MEM_TYPE = 1
 
@@ -145,6 +133,9 @@ class LogConfig(object):
     """Representation of one log configuration that enables logging
     from the Crazyflie"""
 
+    # Maximum log payload length (4 bytes are used for block id and timestamp)
+    MAX_LEN = 26
+
     def __init__(self, name, period_in_ms):
         """Initialize the entry"""
         self.data_received_cb = Caller()
@@ -162,6 +153,7 @@ class LogConfig(object):
         self.period_in_ms = period_in_ms
         self._added = False
         self._started = False
+        self.pending = False
         self.valid = False
         self.variables = []
         self.default_fetch_as = []
@@ -216,15 +208,22 @@ class LogConfig(object):
     added = property(_get_added, _set_added)
     started = property(_get_started, _set_started)
 
-    def create(self):
-        """Save the log configuration in the Crazyflie"""
-        pk = CRTPPacket()
-        pk.set_header(5, CHAN_SETTINGS)
+    def _cmd_create_block(self):
         if self.useV2:
-            pk.data = (CMD_CREATE_BLOCK_V2, self.id)
+            return CMD_CREATE_BLOCK_V2
         else:
-            pk.data = (CMD_CREATE_BLOCK, self.id)
-        for var in self.variables:
+            return CMD_CREATE_BLOCK
+
+    def _cmd_append_block(self):
+        if self.useV2:
+            return CMD_APPEND_BLOCK_V2
+        else:
+            return CMD_APPEND_BLOCK
+
+    def _setup_log_elements(self, pk, next_to_add):
+        i = next_to_add
+        for i in range(next_to_add, len(self.variables)):
+            var = self.variables[i]
             if (var.is_toc_variable() is False):  # Memory location
                 logger.debug('Logging to raw memory %d, 0x%04X',
                              var.get_storage_and_fetch_byte(), var.address)
@@ -232,30 +231,71 @@ class LogConfig(object):
                                            var.get_storage_and_fetch_byte()))
                 pk.data.append(struct.pack('<I', var.address))
             else:  # Item in TOC
+                element_id = self.cf.log.toc.get_element_id(var.name)
                 logger.debug('Adding %s with id=%d and type=0x%02X',
                              var.name,
-                             self.cf.log.toc.get_element_id(
-                                 var.name), var.get_storage_and_fetch_byte())
+                             element_id,
+                             var.get_storage_and_fetch_byte())
                 pk.data.append(var.get_storage_and_fetch_byte())
                 if self.useV2:
-                    ident = self.cf.log.toc.get_element_id(var.name)
-                    pk.data.append(ident & 0x0ff)
-                    pk.data.append((ident >> 8) & 0x0ff)
+                    size_to_add = 2
+                    if pk.available_data_size() >= size_to_add:
+                        pk.data.append(element_id & 0x0ff)
+                        pk.data.append((element_id >> 8) & 0x0ff)
+                    else:
+                        # Packet is full
+                        return False, i
                 else:
-                    pk.data.append(self.cf.log.toc.get_element_id(var.name))
-        logger.debug('Adding log block id {}'.format(self.id))
-        if self.useV2:
-            self.cf.send_packet(pk, expected_reply=(
-                CMD_CREATE_BLOCK_V2, self.id))
+                    pk.data.append(element_id)
+
+        return True, i
+
+    def create(self):
+        """Save the log configuration in the Crazyflie"""
+        command = self._cmd_create_block()
+        next_to_add = 0
+        is_done = False
+
+        num_variables = 0
+        pending = 0
+        for block in self.cf.log.log_blocks:
+            if block.pending or block.added or block.started:
+                pending += 1
+                num_variables += len(block.variables)
+
+        if pending < Log.MAX_BLOCKS:
+            #
+            # The Crazyflie firmware can only handle 128 variables before
+            # erroring out with ENOMEM.
+            #
+            if num_variables + len(self.variables) > Log.MAX_VARIABLES:
+                raise AttributeError(
+                    ('Adding this configuration would exceed max number '
+                     'of variables (%d)' % Log.MAX_VARIABLES)
+                )
         else:
-            self.cf.send_packet(pk, expected_reply=(CMD_CREATE_BLOCK, self.id))
+            raise AttributeError(
+                'Configuration has max number of blocks (%d)' % Log.MAX_BLOCKS
+            )
+        self.pending += 1
+        while not is_done:
+            pk = CRTPPacket()
+            pk.set_header(5, CHAN_SETTINGS)
+            pk.data = (command, self.id)
+            is_done, next_to_add = self._setup_log_elements(pk, next_to_add)
+
+            logger.debug('Adding/appending log block id {}'.format(self.id))
+            self.cf.send_packet(pk, expected_reply=(command, self.id))
+
+            # Use append if we have to add more variables
+            command = self._cmd_append_block()
 
     def start(self):
         """Start the logging for this entry"""
         if (self.cf.link is not None):
             if (self._added is False):
                 self.create()
-                logger.debug('First time block is started, add block')
+                logger.debug('First time block is started, add block id =%d',self.id)
             else:
                 logger.debug('Block already registered, starting logging'
                              ' for id=%d', self.id)
@@ -269,7 +309,7 @@ class LogConfig(object):
         """Stop the logging for this entry"""
         if (self.cf.link is not None):
             if (self.id is None):
-                logger.warning('Stopping block, but no block registered')
+                logger.warning('Stopping block, but no block registered id =%d',self.id)
             else:
                 logger.debug('Sending stop logging for block id=%d', self.id)
                 pk = CRTPPacket()
@@ -282,7 +322,7 @@ class LogConfig(object):
         """Delete this entry in the Crazyflie"""
         if (self.cf.link is not None):
             if (self.id is None):
-                logger.warning('Delete block, but no block registered')
+                logger.warning('Delete block, but no block registered id =%d',self.id)
             else:
                 logger.debug('LogEntry: Sending delete logging for block id=%d'
                              % self.id)
@@ -293,7 +333,7 @@ class LogConfig(object):
                     pk, expected_reply=(CMD_DELETE_BLOCK, self.id))
 
     def unpack_log_data(self, log_data, timestamp):
-        """Unpack received logging data so it repreloggingsent real values according
+        """Unpack received logging data so it represent real values according
         to the configuration in the entry"""
         ret_data = {}
         data_index = 0
@@ -317,7 +357,7 @@ class LogTocElement:
              0x04: ('int8_t', '<b', 1),
              0x05: ('int16_t', '<h', 2),
              0x06: ('int32_t', '<i', 4),
-             0x08: ('FP16', '<h', 2),
+             0x08: ('FP16', '<e', 2),
              0x07: ('float', '<f', 4)}
 
     @staticmethod
@@ -374,6 +414,9 @@ class LogTocElement:
 
 class Log():
     """Create log configuration"""
+
+    MAX_BLOCKS = 16
+    MAX_VARIABLES = 128
 
     # These codes can be decoded using os.stderror, but
     # some of the text messages will look very strange
@@ -451,7 +494,7 @@ class Log():
                     logconf.valid = False
                     raise KeyError('Variable {} not in TOC'.format(var.name))
 
-        if (size <= MAX_LOG_DATA_PACKET_SIZE and
+        if (size <= LogConfig.MAX_LEN and
                 (logconf.period > 0 and logconf.period < 0xFF)):
             logconf.valid = True
             logconf.cf = self.cf
@@ -466,6 +509,13 @@ class Log():
                 'The log configuration is too large or has an invalid '
                 'parameter')
 
+    def reset(self):
+        """
+        Reset the log system and remove all log blocks
+        """
+        self.log_blocks = []
+        self._send_reset_packet()
+
     def refresh_toc(self, refresh_done_callback, toc_cache):
         """Start refreshing the table of loggale variables"""
 
@@ -475,6 +525,9 @@ class Log():
         self._refresh_callback = refresh_done_callback
         self.toc = None
 
+        self._send_reset_packet()
+
+    def _send_reset_packet(self):
         pk = CRTPPacket()
         pk.set_header(CRTPPort.LOGGING, CHAN_SETTINGS)
         pk.data = (CMD_RESET_LOGGING,)
@@ -508,6 +561,7 @@ class Log():
                             self.cf.send_packet(pk, expected_reply=(
                                 CMD_START_LOGGING, id))
                             block.added = True
+                            block.pending = False
                     else:
                         msg = self._err_codes[error_status]
                         logger.warning('Error %d when adding id=%d (%s)',

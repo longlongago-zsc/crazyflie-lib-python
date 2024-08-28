@@ -20,10 +20,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Crazyflie radio bootloader for flashing firmware.
 """
@@ -37,7 +35,6 @@ import cflib.crtp
 from .boottypes import Target
 from .boottypes import TargetTypes
 from cflib.crtp.crtpstack import CRTPPacket
-from cflib.crtp.crtpstack import CRTPPort
 
 __author__ = 'Bitcraze AB'
 __all__ = ['Cloader']
@@ -72,7 +69,7 @@ class Cloader:
 
         self.targets = {}
         self.mapping = None
-        self._available_boot_uri = ('radio://0/110/2M', 'radio://0/0/2M')
+        self._available_boot_uri = ('radio://0/110/2M/E7E7E7E7E7', 'radio://0/0/2M/E7E7E7E7E7')
 
     def close(self):
         """ Close the link """
@@ -80,7 +77,7 @@ class Cloader:
             self.link.close()
 
     def scan_for_bootloader(self):
-        link = cflib.crtp.get_link_driver('radio://0')
+        link = cflib.crtp.get_link_driver('radio://0/80/2M/E7E7E7E7E7')
         ts = time.time()
         res = ()
         while len(res) == 0 and (time.time() - ts) < 10:
@@ -92,153 +89,80 @@ class Cloader:
             return res[0]
         return None
 
-    def reset_to_bootloader(self, target_id):
-        retry_counter = 5
-        pk = CRTPPacket()
-        pk.set_header(0xFF, 0xFF)
-        pk.data = (target_id, 0xFF)
+    def reset_to_bootloader(self, target_id: int) -> bool:
+        pk = CRTPPacket(0xFF, [target_id, 0xFF])
         self.link.send_packet(pk)
+        address = None
 
-        got_answer = False
-        while(not got_answer and retry_counter >= 0):
-            pk = self.link.receive_packet(1)
-            if pk and pk.header == 0xFF:
-                try:
-                    data = struct.unpack('<BB', pk.data[0:2])
-                    got_answer = data == (target_id, 0xFF)
-                except struct.error:
-                    # Failed unpacking, retry
-                    pass
-
-        if got_answer:
-            new_address = (0xb1,) + struct.unpack('<BBBB', pk.data[2:6][::-1])
-
-            # The reset packet arrival cannot be checked.
-            # Send it more than one time to increase the chances it makes it.
-            for _ in range(10):
-                pk = CRTPPacket()
-                pk.set_header(0xFF, 0xFF)
-                pk.data = (target_id, 0xF0, 0x00)
-                self.link.send_packet(pk)
-
-            addr = int(binascii.hexlify(
-                struct.pack('B' * 5, *new_address)), 16)
-
-            time.sleep(1)
-            self.link.close()
-            time.sleep(0.2)
-            self.link = cflib.crtp.get_link_driver(
-                'radio://0/0/2M/{:X}'.format(addr))
-
-            return True
-        else:
-            return False
-
-    def reset_to_bootloader1(self, cpu_id):
-        """ Reset to the bootloader
-        The parameter cpuid shall correspond to the device to reset.
-
-        Return true if the reset has been done and the contact with the
-        bootloader is established.
-        """
-        # Send an echo request and wait for the answer
-        # Mainly aim to bypass a bug of the crazyflie firmware that prevents
-        # reset before normal CRTP communication
-        pk = CRTPPacket()
-        pk.port = CRTPPort.LINKCTRL
-        pk.data = (1, 2, 3) + cpu_id
-        self.link.send_packet(pk)
-
-        pk = None
-        while True:
+        timeout = 5  # seconds
+        ts = time.time()
+        while time.time() - ts < timeout:
             pk = self.link.receive_packet(2)
-            if not pk:
-                return False
+            if pk is None:
+                continue
+            if pk.port == 15 and pk.channel == 3 and len(pk.data) > 3:
+                if struct.unpack('<BB', pk.data[0:2]) != (target_id, 0xFF):
+                    continue
 
-            if pk.port == CRTPPort.LINKCTRL:
-                break
+                address = 'B1' + binascii.hexlify(pk.data[2:6][::-1]).upper().decode('utf8')
 
-        # Send the reset to bootloader request
-        pk = CRTPPacket()
-        pk.set_header(0xFF, 0xFF)
-        pk.data = (0xFF, 0xFE) + cpu_id
-        self.link.send_packet(pk)
-
-        # Wait to ack the reset ...
-        pk = None
-        while True:
-            pk = self.link.receive_packet(2)
-            if not pk:
-                return False
-
-            if pk.port == 0xFF and tuple(pk.data) == (0xFF, 0xFE) + cpu_id:
-                pk.data = (0xFF, 0xF0) + cpu_id
+                pk = CRTPPacket(0xFF, [target_id, 0xF0, 0x00])
                 self.link.send_packet(pk)
-                break
+                time.sleep(0.5)
 
-        time.sleep(0.1)
-        self.link.close()
-        self.link = cflib.crtp.get_link_driver(self.clink_address)
-        # time.sleep(0.1)
+                self.link.close()
+                self.link = cflib.crtp.get_link_driver(f'radio://0/0/2M/{address}?safelink=0')
+                time.sleep(0.5)
+                return True
 
-        return self._update_info()
+        return False
 
-    def reset_to_firmware(self, target_id):
+    def reset_to_firmware(self, target_id: int) -> bool:
         """ Reset to firmware
-        The parameter cpuid shall correspond to the device to reset.
+        The parameter target_id corresponds to the device to reset.
 
-        Return true if the reset has been done
+        Return True if the reset has been done, False on timeout
         """
-        # The fake CPU ID is legacy from the Crazyflie 1.0
-        # In order to reset the CPU id had to be sent, but this
-        # was removed before launching it. But the length check is
-        # still in the bootloader. So to work around this bug so
-        # some extra data needs to be sent.
-        fake_cpu_id = (1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12)
-        # Send the reset to bootloader request
-        pk = CRTPPacket()
-        pk.set_header(0xFF, 0xFF)
-        pk.data = (target_id, 0xFF) + fake_cpu_id
+        pk = CRTPPacket(0xFF, [target_id, 0xFF])
         self.link.send_packet(pk)
 
-        # Wait to ack the reset ...
-        pk = None
-        while True:
-            pk = self.link.receive_packet(2)
-            if not pk:
-                return False
-
-            if (pk.header == 0xFF and struct.unpack(
-                    'B' * len(pk.data), pk.data)[:2] == (target_id, 0xFF)):
-                # Difference in CF1 and CF2 (CPU ID)
-                if target_id == 0xFE:
-                    pk.data = (target_id, 0xF0, 0x01)
-                else:
-                    pk.data = (target_id, 0xF0) + fake_cpu_id
+        timeout = 5  # seconds
+        ts = time.time()
+        while time.time() - ts < timeout:
+            answer = self.link.receive_packet(2)
+            if answer is None:
                 self.link.send_packet(pk)
-                break
+                continue
+            if answer.port == 15 and answer.channel == 3 and len(answer.data) > 2:
+                if struct.unpack('<BB', pk.data[0:2]) != (target_id, 0xFF):
+                    continue
+                pk = CRTPPacket(0xff, [target_id, 0xf0, 0x01])
+                self.link.send_packet(pk)
+                time.sleep(1)
+                return True
 
         time.sleep(0.1)
+        return False
 
     def open_bootloader_uri(self, uri=None):
         if self.link:
             self.link.close()
         if uri:
-            self.link = cflib.crtp.get_link_driver(uri)
+            self.link = cflib.crtp.get_link_driver(uri + '?safelink=0')
         else:
-            self.link = cflib.crtp.get_link_driver(self.clink_address)
+            self.link = cflib.crtp.get_link_driver(
+                self.clink_address + '?safelink=0')
 
     def check_link_and_get_info(self, target_id=0xFF):
-        """Try to get a connection with the bootloader by requesting info
-        5 times. This let roughly 10 seconds to boot the copter ..."""
-        for _ in range(0, 5):
-            if self._update_info(target_id):
-                if self._in_boot_cb:
-                    self._in_boot_cb.call(True, self.targets[
-                        target_id].protocol_version)
-                if self._info_cb:
-                    self._info_cb.call(self.targets[target_id])
-                return True
+        """Try to get a connection with the bootloader ...
+           update_info has a timeout of 10 seconds """
+        if self._update_info(target_id):
+            if self._in_boot_cb:
+                self._in_boot_cb.call(True, self.targets[
+                    target_id].protocol_version)
+            if self._info_cb:
+                self._info_cb.call(self.targets[target_id])
+            return True
         return False
 
     def request_info_update(self, target_id):
@@ -259,32 +183,46 @@ class Cloader:
         pk.data = (target_id, 0x10)
         self.link.send_packet(pk)
 
-        # Wait for the answer
-        pk = self.link.receive_packet(2)
+        timeout = 10  # seconds
+        ts = time.time()
+        while time.time() - ts < timeout:
+            # Wait for the answer
+            answer = self.link.receive_packet(2)
+            if answer is None:
+                self.link.send_packet(pk)
 
-        if (pk and pk.header == 0xFF and struct.unpack('<BB', pk.data[0:2]) ==
-                (target_id, 0x10)):
-            tab = struct.unpack('BBHHHH', pk.data[0:10])
-            cpuid = struct.unpack('B' * 12, pk.data[10:22])
-            if target_id not in self.targets:
-                self.targets[target_id] = Target(target_id)
-            self.targets[target_id].addr = target_id
-            if len(pk.data) > 22:
-                self.targets[target_id].protocol_version = pk.datat[22]
-                self.protocol_version = pk.datat[22]
-            self.targets[target_id].page_size = tab[2]
-            self.targets[target_id].buffer_pages = tab[3]
-            self.targets[target_id].flash_pages = tab[4]
-            self.targets[target_id].start_page = tab[5]
-            self.targets[target_id].cpuid = '%02X' % cpuid[0]
-            for i in cpuid[1:]:
-                self.targets[target_id].cpuid += ':%02X' % i
+            if (answer and answer.header == 0xFF and struct.unpack('<BB', answer.data[0:2]) ==
+                    (target_id, 0x10)):
+                tab = struct.unpack('BBHHHH', answer.data[0:10])
+                cpuid = struct.unpack('B' * 12, answer.data[10:22])
+                if target_id not in self.targets:
+                    self.targets[target_id] = Target(target_id)
+                self.targets[target_id].addr = target_id
+                if len(answer.data) > 22:
+                    self.targets[target_id].protocol_version = answer.data[22]
+                    self.protocol_version = answer.data[22]
+                if len(answer.data) > 23 and len(answer.data) > 26:
+                    code_state = ''
+                    if answer.data[24] & 0x80 != 0:
+                        code_state = '+'
+                    answer.data[24] &= 0x7F
+                    major = struct.unpack('H', answer.data[23:25])[0]
+                    minor = answer.data[25]
+                    patch = answer.data[26]
+                    self.targets[target_id].version = '{}.{}.{}{}'.format(major, minor, patch, code_state)
+                self.targets[target_id].page_size = tab[2]
+                self.targets[target_id].buffer_pages = tab[3]
+                self.targets[target_id].flash_pages = tab[4]
+                self.targets[target_id].start_page = tab[5]
+                self.targets[target_id].cpuid = '%02X' % cpuid[0]
+                for i in cpuid[1:]:
+                    self.targets[target_id].cpuid += ':%02X' % i
 
-            if (self.protocol_version == 0x10 and
-                    target_id == TargetTypes.STM32):
-                self._update_mapping(target_id)
+                if (self.protocol_version == 0x10 and
+                        target_id == TargetTypes.STM32):
+                    self._update_mapping(target_id)
 
-            return True
+                return True
 
         return False
 
@@ -296,7 +234,7 @@ class Cloader:
 
         pk = self.link.receive_packet(2)
 
-        if (pk and pk.header == 0xFF and struct.unpack('<BB', pk.data[0:2]) ==
+        if (pk and pk.header == 0xFF and len(pk.data) >= 2 and struct.unpack('<BB', pk.data[0:2]) ==
                 (target_id, 0x12)):
             m = pk.datat[2:]
 
@@ -343,7 +281,7 @@ class Cloader:
             pk = None
             retry_counter = 5
             while ((not pk or pk.header != 0xFF or
-                    struct.unpack('<BB', pk.data[0:2]) != (addr, 0x1C)) and
+                    struct.unpack('<BBHH', pk.data[0:6]) != (addr, 0x1C, page, (i * 25))) and
                     retry_counter >= 0):
                 pk = CRTPPacket()
                 pk.set_header(0xFF, 0xFF)
@@ -373,7 +311,7 @@ class Cloader:
 
         retry_counter = 5
         # print "Flasing to 0x{:X}".format(addr)
-        while ((not pk or pk.header != 0xFF or
+        while ((not pk or pk.header != 0xFF or len(pk.data) < 2 or
                 struct.unpack('<BB', pk.data[0:2]) != (addr, 0x18)) and
                retry_counter >= 0):
             pk = CRTPPacket()
@@ -381,7 +319,14 @@ class Cloader:
             pk.data = struct.pack('<BBHHH', addr, 0x18, page_buffer,
                                   target_page, page_count)
             self.link.send_packet(pk)
-            pk = self.link.receive_packet(1)
+
+            # Timeout for writing to flash is raised from 1s (used elsewhere
+            # in this module) to 2.5s because it may take more than a second
+            # to erase a page on the STM32F405.
+            #
+            # See https://github.com/bitcraze/crazyflie-lib-python/issues/98
+            # for more details.
+            pk = self.link.receive_packet(2.5)
             retry_counter -= 1
 
         if retry_counter < 0:

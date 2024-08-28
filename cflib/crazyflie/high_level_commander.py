@@ -7,7 +7,7 @@
 #  +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
 #   ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
 #
-#  Copyright (C) 2018 Bitcraze AB
+#  Copyright (C) 2018-2020 Bitcraze AB
 #
 #  Crazyflie Nano Quadcopter Client
 #
@@ -20,10 +20,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Used for sending high level setpoints to the Crazyflie
 """
@@ -42,17 +40,19 @@ class HighLevelCommander():
     """
 
     COMMAND_SET_GROUP_MASK = 0
-    COMMAND_TAKEOFF = 1
-    COMMAND_LAND = 2
     COMMAND_STOP = 3
     COMMAND_GO_TO = 4
     COMMAND_START_TRAJECTORY = 5
     COMMAND_DEFINE_TRAJECTORY = 6
+    COMMAND_TAKEOFF_2 = 7
+    COMMAND_LAND_2 = 8
 
     ALL_GROUPS = 0
 
     TRAJECTORY_LOCATION_MEM = 1
+
     TRAJECTORY_TYPE_POLY4D = 0
+    TRAJECTORY_TYPE_POLY4D_COMPRESSED = 1
 
     def __init__(self, crazyflie=None):
         """
@@ -64,47 +64,67 @@ class HighLevelCommander():
         """
         Set the group mask that the Crazyflie belongs to
 
-        :param group_mask: mask for which groups this CF belongs to
+        :param group_mask: Mask for which groups this CF belongs to
         """
         self._send_packet(struct.pack('<BB',
                                       self.COMMAND_SET_GROUP_MASK,
                                       group_mask))
 
-    def takeoff(self, absolute_height_m, duration_s, group_mask=ALL_GROUPS):
+    def takeoff(self, absolute_height_m, duration_s, group_mask=ALL_GROUPS,
+                yaw=0.0):
         """
         vertical takeoff from current x-y position to given height
 
-        :param absolute_height_m: absolut (m)
-        :param duration_s: time it should take until target height is
+        :param absolute_height_m: Absolute (m)
+        :param duration_s: Time it should take until target height is
                            reached (s)
-        :param group_mask: mask for which CFs this should apply to
+        :param group_mask: Mask for which CFs this should apply to
+        :param yaw: Yaw (rad). Use current yaw if set to None.
         """
-        self._send_packet(struct.pack('<BBff',
-                                      self.COMMAND_TAKEOFF,
+        target_yaw = yaw
+        useCurrentYaw = False
+        if yaw is None:
+            target_yaw = 0.0
+            useCurrentYaw = True
+
+        self._send_packet(struct.pack('<BBff?f',
+                                      self.COMMAND_TAKEOFF_2,
                                       group_mask,
                                       absolute_height_m,
+                                      target_yaw,
+                                      useCurrentYaw,
                                       duration_s))
 
-    def land(self, absolute_height_m, duration_s, group_mask=ALL_GROUPS):
+    def land(self, absolute_height_m, duration_s, group_mask=ALL_GROUPS,
+             yaw=0.0):
         """
         vertical land from current x-y position to given height
 
-        :param absolute_height_m: absolut (m)
-        :param duration_s: time it should take until target height is
+        :param absolute_height_m: Absolute (m)
+        :param duration_s: Time it should take until target height is
                            reached (s)
-        :param group_mask: mask for which CFs this should apply to
+        :param group_mask: Mask for which CFs this should apply to
+        :param yaw: Yaw (rad). Use current yaw if set to None.
         """
-        self._send_packet(struct.pack('<BBff',
-                                      self.COMMAND_LAND,
+        target_yaw = yaw
+        useCurrentYaw = False
+        if yaw is None:
+            target_yaw = 0.0
+            useCurrentYaw = True
+
+        self._send_packet(struct.pack('<BBff?f',
+                                      self.COMMAND_LAND_2,
                                       group_mask,
                                       absolute_height_m,
+                                      target_yaw,
+                                      useCurrentYaw,
                                       duration_s))
 
     def stop(self, group_mask=ALL_GROUPS):
         """
         stops the current trajectory (turns off the motors)
 
-        :param group_mask: mask for which CFs this should apply to
+        :param group_mask: Mask for which CFs this should apply to
         :return:
         """
         self._send_packet(struct.pack('<BB',
@@ -116,13 +136,13 @@ class HighLevelCommander():
         """
         Go to an absolute or relative position
 
-        :param x: x (m)
-        :param y: y (m)
-        :param z: z (m)
-        :param yaw: yaw (radians)
-        :param duration_s: time it should take to reach the position (s)
+        :param x: X (m)
+        :param y: Y (m)
+        :param z: Z (m)
+        :param yaw: Yaw (radians)
+        :param duration_s: Time it should take to reach the position (s)
         :param relative: True if x, y, z is relative to the current position
-        :param group_mask: mask for which CFs this should apply to
+        :param group_mask: Mask for which CFs this should apply to
         """
         self._send_packet(struct.pack('<BBBfffff',
                                       self.COMMAND_GO_TO,
@@ -137,16 +157,16 @@ class HighLevelCommander():
         """
         starts executing a specified trajectory
 
-        :param trajectory_id: id of the trajectory (previously defined by
+        :param trajectory_id: Id of the trajectory (previously defined by
                define_trajectory)
-        :param time_scale: time factor; 1.0 = original speed;
+        :param time_scale: Time factor; 1.0 = original speed;
                                         >1.0: slower;
                                         <1.0: faster
-        :param relative: set to True, if trajectory should be shifted to
+        :param relative: Set to True, if trajectory should be shifted to
                current setpoint
-        :param reversed: set to True, if trajectory should be executed in
+        :param reversed: Set to True, if trajectory should be executed in
                reverse
-        :param group_mask: mask for which CFs this should apply to
+        :param group_mask: Mask for which CFs this should apply to
         :return:
         """
         self._send_packet(struct.pack('<BBBBBf',
@@ -157,20 +177,21 @@ class HighLevelCommander():
                                       trajectory_id,
                                       time_scale))
 
-    def define_trajectory(self, trajectory_id, offset, n_pieces):
+    def define_trajectory(self, trajectory_id, offset, n_pieces, type=TRAJECTORY_TYPE_POLY4D):
         """
         Define a trajectory that has previously been uploaded to memory.
 
         :param trajectory_id: The id of the trajectory
-        :param offset: offset in uploaded memory
+        :param offset: Offset in uploaded memory
         :param n_pieces: Nr of pieces in the trajectory
+        :param type: The type of trajectory data; TRAJECTORY_TYPE_POLY4D or TRAJECTORY_TYPE_POLY4D_COMPRESSED
         :return:
         """
         self._send_packet(struct.pack('<BBBBIB',
                                       self.COMMAND_DEFINE_TRAJECTORY,
                                       trajectory_id,
                                       self.TRAJECTORY_LOCATION_MEM,
-                                      self.TRAJECTORY_TYPE_POLY4D,
+                                      type,
                                       offset,
                                       n_pieces))
 

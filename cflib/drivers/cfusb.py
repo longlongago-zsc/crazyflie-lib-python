@@ -20,17 +20,24 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 USB driver for the Crazyflie.
 """
 import logging
 import os
+import platform
 
+import libusb_package
 import usb
+import usb.core
+
+try:
+    if os.environ['CRTP_PCAP_LOG'] is not None:
+        from cflib.crtp.pcap import PCAPLog
+except KeyError:
+    pass
 
 __author__ = 'Bitcraze AB'
 __all__ = ['CfUsb']
@@ -39,19 +46,6 @@ logger = logging.getLogger(__name__)
 
 USB_VID = 0x0483
 USB_PID = 0x5740
-
-try:
-    import usb.core
-
-    pyusb_backend = None
-    if os.name == 'nt':
-        import usb.backend.libusb0 as libusb0
-
-        pyusb_backend = libusb0.get_backend()
-    pyusb1 = True
-
-except Exception:
-    pyusb1 = False
 
 
 def _find_devices():
@@ -62,17 +56,19 @@ def _find_devices():
 
     logger.info('Looking for devices....')
 
-    if pyusb1:
-        for d in usb.core.find(idVendor=USB_VID, idProduct=USB_PID, find_all=1,
-                               backend=pyusb_backend):
-            ret.append(d)
+    if os.name == 'nt':
+        import usb.backend.libusb0 as libusb0
+
+        backend = libusb0.get_backend()
     else:
-        busses = usb.busses()
-        for bus in busses:
-            for device in bus.devices:
-                if device.idVendor == USB_VID:
-                    if device.idProduct == USB_PID:
-                        ret += [device, ]
+        backend = libusb_package.get_libusb1_backend()
+
+    devices = usb.core.find(idVendor=USB_VID, idProduct=USB_PID, find_all=1,
+                            backend=backend)
+    if devices:
+        for d in devices:
+            if d.manufacturer == 'Bitcraze AB':
+                ret.append(d)
 
     return ret
 
@@ -94,18 +90,22 @@ class CfUsb:
             except Exception:
                 self.dev = None
 
+        try:  # configuration might already be confgiured by composite VCP, try claim interface
+            usb.util.claim_interface(self.dev, 0)
+        except Exception:
+            try:
+                self.dev.set_configuration()  # it was not, then set configuration
+            except Exception:
+                if self.dev:
+                    if platform.system() == 'Linux':
+                        self.dev.reset()
+                        self.dev.set_configuration()
+
+        self.handle = self.dev
         if self.dev:
-            if (pyusb1 is True):
-                self.dev.set_configuration(1)
-                self.handle = self.dev
-                self.version = float(
-                    '{0:x}.{1:x}'.format(self.dev.bcdDevice >> 8,
-                                         self.dev.bcdDevice & 0x0FF))
-            else:
-                self.handle = self.dev.open()
-                self.handle.setConfiguration(1)
-                self.handle.claimInterface(0)
-                self.version = float(self.dev.deviceVersion)
+            self.version = float('{0:x}.{1:x}'.format(self.dev.bcdDevice >> 8, self.dev.bcdDevice & 0x0FF))
+        else:
+            self.version = 0.0
 
     def get_serial(self):
         # The signature for get_string has changed between versions to 1.0.0b1,
@@ -117,13 +117,8 @@ class CfUsb:
             return usb.util.get_string(self.dev, self.dev.iSerialNumber)
 
     def close(self):
-        if (pyusb1 is False):
-            if self.handle:
-                self.handle.releaseInterface()
-                self.handle.reset()
-        else:
-            if self.dev:
-                self.dev.reset()
+        if self.dev:
+            usb.util.dispose_resources(self.dev)
 
         self.handle = None
         self.dev = None
@@ -134,32 +129,43 @@ class CfUsb:
             return [('usb://0', '')]
         return []
 
-    def set_crtp_to_usb(self, crtp_to_usb):
+    def set_crtp_to_usb(self, crtp_to_usb: bool):
         if crtp_to_usb:
             _send_vendor_setup(self.handle, 0x01, 0x01, 1, ())
         else:
             _send_vendor_setup(self.handle, 0x01, 0x01, 0, ())
 
+    def _log_packet(self, receive, id, packet):
+        try:
+            if os.environ['CRTP_PCAP_LOG'] is not None:
+                if len(packet) > 0:
+                    logger = PCAPLog.instance()
+                    logger.logCRTP(
+                        logger.LinkType.USB,
+                        receive,
+                        id,
+                        bytearray.fromhex(self.get_serial()),
+                        0,
+                        packet
+                    )
+        except KeyError:
+            pass
+
     # Data transfers
     def send_packet(self, dataOut):
         """ Send a packet and receive the ack from the radio dongle
-            The ack contains information about the packet transmition
+            The ack contains information about the packet transmission
             and a data payload if the ack packet contained any """
         try:
-            if (pyusb1 is False):
-                self.handle.bulkWrite(1, dataOut, 20)
-            else:
-                self.handle.write(endpoint=1, data=dataOut, timeout=20)
+            self.handle.write(endpoint=1, data=dataOut, timeout=20)
+            self._log_packet(False, self.dev.port_number, dataOut)
         except usb.USBError:
             pass
 
     def receive_packet(self):
         dataIn = ()
         try:
-            if (pyusb1 is False):
-                dataIn = self.handle.bulkRead(0x81, 64, 20)
-            else:
-                dataIn = self.handle.read(0x81, 64, timeout=20)
+            dataIn = self.handle.read(0x81, 64, timeout=20)
         except usb.USBError as e:
             try:
                 if e.backend_error_code == -7 or e.backend_error_code == -116:
@@ -174,24 +180,18 @@ class CfUsb:
                 # supported, but the "normal" case will work.
                 pass
 
+        self._log_packet(True, self.dev.port_number, dataIn)
+
         return dataIn
 
 
 # Private utility functions
 def _send_vendor_setup(handle, request, value, index, data):
-    if pyusb1:
-        handle.ctrl_transfer(usb.TYPE_VENDOR, request, wValue=value,
-                             wIndex=index, timeout=1000, data_or_wLength=data)
-    else:
-        handle.controlMsg(usb.TYPE_VENDOR, request, data, value=value,
-                          index=index, timeout=1000)
+    handle.ctrl_transfer(usb.TYPE_VENDOR, request, wValue=value,
+                         wIndex=index, timeout=1000, data_or_wLength=data)
 
 
 def _get_vendor_setup(handle, request, value, index, length):
-    if pyusb1:
-        return handle.ctrl_transfer(usb.TYPE_VENDOR | 0x80, request,
-                                    wValue=value, wIndex=index, timeout=1000,
-                                    data_or_wLength=length)
-    else:
-        return handle.controlMsg(usb.TYPE_VENDOR | 0x80, request, length,
-                                 value=value, index=index, timeout=1000)
+    return handle.ctrl_transfer(usb.TYPE_VENDOR | 0x80, request,
+                                wValue=value, wIndex=index, timeout=1000,
+                                data_or_wLength=length)

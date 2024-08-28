@@ -17,16 +17,14 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 This script implements a simple matrix light printer to be used with a
 camera with open shutter in a dark room.
 
 It requires a Crazyflie capable of controlling its position and with
-a Led ring attached to it. A piece of sicky paper can be attached on
+a Led ring attached to it. A piece of sticky paper can be attached on
 the led ring to orient the ring light toward the front.
 
 To control it position, Crazyflie requires an absolute positioning
@@ -40,9 +38,10 @@ import cflib.crtp
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.positioning.position_hl_commander import PositionHlCommander
+from cflib.utils import uri_helper
 
 # URI to the Crazyflie to connect to
-uri = 'radio://0/80'
+uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
 
 
 class ImageDef:
@@ -106,10 +105,10 @@ def matrix_print(cf, pc, image_def):
 
 
 if __name__ == '__main__':
-    cflib.crtp.init_drivers(enable_debug_driver=False)
+    cflib.crtp.init_drivers()
 
     image_def = ImageDef('monalisa.png')
 
     with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
-        with PositionHlCommander(scf, default_height=0.5) as pc:
+        with PositionHlCommander(scf, default_height=0.5, controller=PositionHlCommander.CONTROLLER_PID) as pc:
             matrix_print(scf.cf, pc, image_def)

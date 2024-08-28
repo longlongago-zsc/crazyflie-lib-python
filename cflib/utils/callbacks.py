@@ -20,13 +20,12 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Callback objects used in the Crazyflie library
 """
+from threading import Event
 
 __author__ = 'Bitcraze AB'
 __all__ = ['Caller']
@@ -50,5 +49,32 @@ class Caller():
 
     def call(self, *args):
         """ Call the callbacks registered with the arguments args """
-        for cb in self.callbacks:
+        copy_of_callbacks = list(self.callbacks)
+        for cb in copy_of_callbacks:
             cb(*args)
+
+
+class Syncer:
+    """A class to create synchronous behavior for methods using callbacks"""
+
+    def __init__(self):
+        self._event = Event()
+        self.success_args = None
+        self.failure_args = None
+        self.is_success = False
+
+    def success_cb(self, *args):
+        self.success_args = args
+        self.is_success = True
+        self._event.set()
+
+    def failure_cb(self, *args):
+        self.failure_args = args
+        self.is_success = False
+        self._event.set()
+
+    def wait(self):
+        self._event.wait()
+
+    def clear(self):
+        self._event.clear()

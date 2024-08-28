@@ -20,12 +20,10 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-A generic TableOfContents module that is used to fetch, store and minipulate
+A generic TableOfContents module that is used to fetch, store and manipulate
 a TOC for logging or parameters.
 """
 import logging
@@ -177,7 +175,12 @@ class TocFetcher:
             else:
                 self.state = GET_TOC_ELEMENT
                 self.requested_index = 0
-                self._request_toc_element(self.requested_index)
+                if (self.nbr_of_items > 0):
+                    self._request_toc_element(self.requested_index)
+                else:
+                    logger.debug('No TOC entries for port [%s]' % self.port)
+                    self._toc_cache.insert(self._crc, self.toc.toc)
+                    self._toc_fetch_finished()
 
         elif (self.state == GET_TOC_ELEMENT):
             # Always add new element, but only request new if it's not the
@@ -197,7 +200,7 @@ class TocFetcher:
             if (self.requested_index < (self.nbr_of_items - 1)):
                 logger.debug('[%d]: More variables, requesting index %d',
                              self.port, self.requested_index + 1)
-                self.requested_index = self.requested_index + 1
+                self.requested_index += 1
                 self._request_toc_element(self.requested_index)
             else:  # No more variables in TOC
                 self._toc_cache.insert(self._crc, self.toc.toc)

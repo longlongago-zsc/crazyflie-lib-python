@@ -17,10 +17,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 The PositionHlCommander is used to make it easy to write scripts that moves the
 Crazyflie around. Some sort of positioning support is required, for
@@ -52,17 +50,19 @@ class PositionHlCommander:
                  x=0.0, y=0.0, z=0.0,
                  default_velocity=0.5,
                  default_height=0.5,
-                 controller=CONTROLLER_PID):
+                 controller=None,
+                 default_landing_height=0.0):
         """
         Construct an instance of a PositionHlCommander
 
-        :param crazyflie: a Crazyflie or SyncCrazyflie instance
+        :param crazyflie: A Crazyflie or SyncCrazyflie instance
         :param x: Initial position, x
         :param y: Initial position, y
         :param z: Initial position, z
-        :param default_velocity: the default velocity to use
-        :param default_height: the default height to fly at
+        :param default_velocity: The default velocity to use
+        :param default_height: The default height to fly at
         :param controller: Which underlying controller to use
+        :param default_landing_height: Landing height (zero if not specified); for landing on objects off the ground
         """
         if isinstance(crazyflie, SyncCrazyflie):
             self._cf = crazyflie.cf
@@ -73,11 +73,18 @@ class PositionHlCommander:
         self._default_height = default_height
         self._controller = controller
 
+        self._activate_controller()
+        self._hl_commander = self._cf.high_level_commander
+
         self._x = x
         self._y = y
         self._z = z
 
         self._is_flying = False
+
+        self._init_time = time.time()
+
+        self._default_landing_height = default_landing_height
 
     def take_off(self, height=DEFAULT, velocity=DEFAULT):
         """
@@ -85,9 +92,9 @@ class PositionHlCommander:
         Do not call this function if you use the with keyword. Take off is
         done automatically when the context is created.
 
-        :param height: the height (meters) to hover at. None uses the default
+        :param height: The height (meters) to hover at. None uses the default
                        height set when constructed.
-        :param velocity: the velocity (meters/second) when taking off
+        :param velocity: The velocity (meters/second) when taking off
         :return:
         """
         if self._is_flying:
@@ -96,11 +103,13 @@ class PositionHlCommander:
         if not self._cf.is_connected():
             raise Exception('Crazyflie is not connected')
 
+        # Wait a bit to let the HL commander record the current position
+        now = time.time()
+        hold_back = self._init_time + 1.0 - now
+        if (hold_back > 0.0):
+            time.sleep(hold_back)
+
         self._is_flying = True
-        self._reset_position_estimator()
-        self._activate_controller()
-        self._activate_high_level_commander()
-        self._hl_commander = self._cf.high_level_commander
 
         height = self._height(height)
 
@@ -109,7 +118,7 @@ class PositionHlCommander:
         time.sleep(duration_s)
         self._z = height
 
-    def land(self, velocity=DEFAULT):
+    def land(self, velocity=DEFAULT, landing_height=DEFAULT):
         """
         Go straight down and turn off the motors.
 
@@ -120,10 +129,11 @@ class PositionHlCommander:
         :return:
         """
         if self._is_flying:
-            duration_s = self._z / self._velocity(velocity)
-            self._hl_commander.land(0, duration_s)
+            landing_height = self._landing_height(landing_height)
+            duration_s = (self._z - landing_height) / self._velocity(velocity)
+            self._hl_commander.land(landing_height, duration_s)
             time.sleep(duration_s)
-            self._z = 0.0
+            self._z = landing_height
 
             self._hl_commander.stop()
             self._is_flying = False
@@ -139,8 +149,8 @@ class PositionHlCommander:
         """
         Go left
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(0.0, distance_m, 0.0, velocity)
@@ -149,8 +159,8 @@ class PositionHlCommander:
         """
         Go right
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(0.0, -distance_m, 0.0, velocity)
@@ -159,8 +169,8 @@ class PositionHlCommander:
         """
         Go forward
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(distance_m, 0.0, 0.0, velocity)
@@ -169,8 +179,8 @@ class PositionHlCommander:
         """
         Go backwards
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(-distance_m, 0.0, 0.0, velocity)
@@ -179,8 +189,8 @@ class PositionHlCommander:
         """
         Go up
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(0.0, 0.0, distance_m, velocity)
@@ -189,8 +199,8 @@ class PositionHlCommander:
         """
         Go down
 
-        :param distance_m: the distance to travel (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param distance_m: The distance to travel (meters)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
         self.move_distance(0.0, 0.0, -distance_m, velocity)
@@ -206,7 +216,7 @@ class PositionHlCommander:
         :param distance_x_m: The distance to travel along the X-axis (meters)
         :param distance_y_m: The distance to travel along the Y-axis (meters)
         :param distance_z_m: The distance to travel along the Z-axis (meters)
-        :param velocity: the velocity of the motion (meters/second)
+        :param velocity: The velocity of the motion (meters/second)
         :return:
         """
 
@@ -223,7 +233,7 @@ class PositionHlCommander:
         :param x: X coordinate
         :param y: Y coordinate
         :param z: Z coordinate
-        :param velocity: the velocity (meters/second)
+        :param velocity: The velocity (meters/second)
         :return:
         """
 
@@ -260,9 +270,6 @@ class PositionHlCommander:
         """
         self._default_height = height
 
-    def set_controller(self, controller):
-        self._controller = controller
-
     def get_position(self):
         """
         Get the current position
@@ -270,22 +277,10 @@ class PositionHlCommander:
         """
         return self._x, self._y, self._z
 
-    def _reset_position_estimator(self):
-        self._cf.param.set_value('kalman.initialX', '{:.2f}'.format(self._x))
-        self._cf.param.set_value('kalman.initialY', '{:.2f}'.format(self._y))
-        self._cf.param.set_value('kalman.initialZ', '{:.2f}'.format(self._z))
-
-        self._cf.param.set_value('kalman.resetEstimation', '1')
-        time.sleep(0.1)
-        self._cf.param.set_value('kalman.resetEstimation', '0')
-        time.sleep(2)
-
-    def _activate_high_level_commander(self):
-        self._cf.param.set_value('commander.enHighLevel', '1')
-
     def _activate_controller(self):
-        value = str(self._controller)
-        self._cf.param.set_value('stabilizer.controller', value)
+        if self._controller is not None:
+            value = str(self._controller)
+            self._cf.param.set_value('stabilizer.controller', value)
 
     def _velocity(self, velocity):
         if velocity is self.DEFAULT:
@@ -296,3 +291,15 @@ class PositionHlCommander:
         if height is self.DEFAULT:
             return self._default_height
         return height
+
+    def _landing_height(self, landing_height):
+        if landing_height is self.DEFAULT:
+            return self._default_landing_height
+        return landing_height
+
+    def set_landing_height(self, landing_height):
+        """
+        Set the landing height to a specific value
+        Use this function to land on objects that are at non-zero height
+        """
+        self._default_landing_height = landing_height

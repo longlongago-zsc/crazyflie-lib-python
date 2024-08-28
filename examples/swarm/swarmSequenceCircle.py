@@ -19,13 +19,11 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 A script to fly 5 Crazyflies in formation. One stays in the center and the
-other four fly aound it in a circle. Mainly intended to be used with the
+other four fly around it in a circle. Mainly intended to be used with the
 Flow deck.
 The starting positions are vital and should be oriented like this
 
@@ -53,7 +51,7 @@ URI3 = 'radio://0/5/2M/E7E7E7E702'
 URI4 = 'radio://0/110/2M/E7E7E7E703'
 
 # d: diameter of circle
-# z: altituce
+# z: altitude
 params0 = {'d': 1.0, 'z': 0.3}
 params1 = {'d': 1.0, 'z': 0.3}
 params2 = {'d': 0.0, 'z': 0.5}
@@ -76,14 +74,6 @@ params = {
     URI3: [params3],
     URI4: [params4],
 }
-
-
-def reset_estimator(scf):
-    cf = scf.cf
-    cf.param.set_value('kalman.resetEstimation', '1')
-    time.sleep(0.1)
-    cf.param.set_value('kalman.resetEstimation', '0')
-    time.sleep(2)
 
 
 def poshold(cf, t, z):
@@ -139,12 +129,14 @@ def run_sequence(scf, params):
     poshold(cf, 1, base)
 
     cf.commander.send_stop_setpoint()
+    # Hand control over to the high level commander to avoid timeout and locking of the Crazyflie
+    cf.commander.send_notify_setpoint_stop()
 
 
 if __name__ == '__main__':
-    cflib.crtp.init_drivers(enable_debug_driver=False)
+    cflib.crtp.init_drivers()
 
     factory = CachedCfFactory(rw_cache='./cache')
     with Swarm(uris, factory=factory) as swarm:
-        swarm.parallel(reset_estimator)
+        swarm.reset_estimators()
         swarm.parallel(run_sequence, args_dict=params)

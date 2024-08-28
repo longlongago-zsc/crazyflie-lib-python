@@ -17,10 +17,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 import unittest
 
 import cflib.crtp
@@ -35,7 +33,7 @@ from sys_test.swarm_test_rig.rig_support import RigSupport
 
 class TestLogging(unittest.TestCase):
     def setUp(self):
-        cflib.crtp.init_drivers(enable_debug_driver=False)
+        cflib.crtp.init_drivers()
         self.test_rig_support = RigSupport()
 
     def test_that_requested_logging_is_received_properly_from_one_cf(self):

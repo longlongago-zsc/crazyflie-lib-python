@@ -1,14 +1,26 @@
 #!/usr/bin/env python3
+from pathlib import Path
+
 from setuptools import find_packages
 from setuptools import setup
+# read the contents of README.md file fo use in pypi description
+directory = Path(__file__).parent
+long_description = (directory / 'README.md').read_text()
+
+package_data = {
+    'cflib.resources.binaries': ['cflib/resources/binaries/*.bin'],
+}
 
 setup(
     name='cflib',
-    version='0.1.8~1',
-    packages=find_packages(exclude=['examples', 'tests']),
+    version='0.1.26',
+    packages=find_packages(exclude=['examples', 'test']),
 
     description='Crazyflie python driver',
     url='https://github.com/bitcraze/crazyflie-lib-python',
+
+    long_description=long_description,
+    long_description_content_type='text/markdown',
 
     author='Bitcraze and contributors',
     author_email='contact@bitcraze.io',
@@ -24,5 +36,20 @@ setup(
 
     keywords='driver crazyflie quadcopter',
 
-    install_requires='pyusb>=1.0.0b2',
+    install_requires=[
+        'pyusb>=1.0.0b2',
+        'libusb-package~=1.0',
+        'scipy~=1.7',
+        'numpy~=1.20',
+    ],
+
+    # $ pip install -e .[dev]
+    extras_require={
+        'dev': [
+            'pre-commit'
+        ],
+    },
+
+    include_package_data=True,
+    package_data=package_data
 )

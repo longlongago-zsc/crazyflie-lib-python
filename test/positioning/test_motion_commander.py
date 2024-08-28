@@ -17,24 +17,19 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 import math
-import sys
 import unittest
+from unittest.mock import call
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 from cflib.crazyflie import Commander
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie import Param
 from cflib.positioning.motion_commander import _SetPointThread
 from cflib.positioning.motion_commander import MotionCommander
-
-if sys.version_info < (3, 3):
-    from mock import MagicMock, patch, call
-else:
-    from unittest.mock import MagicMock, patch, call
 
 
 @patch('time.sleep')

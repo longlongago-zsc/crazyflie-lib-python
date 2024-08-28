@@ -20,10 +20,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 The Crazyflie module is used to easily connect/send/receive data
 from a Crazyflie.
@@ -36,25 +34,29 @@ import datetime
 import logging
 import time
 from collections import namedtuple
+from threading import current_thread
 from threading import Lock
 from threading import Thread
 from threading import Timer
 
 import cflib.crtp
-from .commander import Commander
-from .console import Console
-from .extpos import Extpos
-from .localization import Localization
-from .log import Log
-from .mem import Memory
-from .param import Param
-from .platformservice import PlatformService
-from .toccache import TocCache
+from cflib.crazyflie.appchannel import Appchannel
+from cflib.crazyflie.commander import Commander
+from cflib.crazyflie.console import Console
+from cflib.crazyflie.extpos import Extpos
+from cflib.crazyflie.localization import Localization
+from cflib.crazyflie.log import Log
+from cflib.crazyflie.mem import Memory
+from cflib.crazyflie.param import Param
+from cflib.crazyflie.platformservice import PlatformService
+from cflib.crazyflie.toccache import TocCache
 from cflib.crazyflie.high_level_commander import HighLevelCommander
 from cflib.utils.callbacks import Caller
 
 __author__ = 'Bitcraze AB'
 __all__ = ['Crazyflie']
+
+logging.basicConfig(level = logging.DEBUG,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -73,8 +75,8 @@ class Crazyflie():
         """
         Create the objects from this module and register callbacks.
 
-        ro_cache -- Path to read-only cache (string)
-        rw_cache -- Path to read-write cache (string)
+        @param ro_cache Path to read-only cache (string)
+        @param rw_cache Path to read-write cache (string)
         """
 
         # Called on disconnect, no matter the reason
@@ -85,9 +87,11 @@ class Crazyflie():
         self.link_established = Caller()
         # Called when the user requests a connection
         self.connection_requested = Caller()
-        # Called when the link is established and the TOCs (that are not
-        # cached) have been downloaded
+        # Called when the link is established and the TOCs (that are not cached) have been downloaded
         self.connected = Caller()
+        # Called when the the link is established and all data, including parameters have been downloaded
+        self.fully_connected = Caller()
+
         # Called if establishing of the link fails (i.e times out)
         self.connection_failed = Caller()
         # Called for every packet received
@@ -105,7 +109,8 @@ class Crazyflie():
 
         self.incoming = _IncomingPacketHandler(self)
         self.incoming.setDaemon(True)
-        self.incoming.start()
+        if self.link:
+            self.incoming.start()
 
         self.commander = Commander(self)
         self.high_level_commander = HighLevelCommander(self)
@@ -116,6 +121,7 @@ class Crazyflie():
         self.param = Param(self)
         self.mem = Memory(self)
         self.platform = PlatformService(self)
+        self.appchannel = Appchannel(self)
 
         self.link_uri = ''
 
@@ -129,6 +135,8 @@ class Crazyflie():
 
         self.connected_ts = None
 
+        self.param.all_updated.add_callback(self._all_parameters_updated)
+
         # Connect callbacks to logger
         self.disconnected.add_callback(
             lambda uri: logger.info('Callback->Disconnected from [%s]', uri))
@@ -136,17 +144,15 @@ class Crazyflie():
         self.link_established.add_callback(
             lambda uri: logger.info('Callback->Connected to [%s]', uri))
         self.connection_lost.add_callback(
-            lambda uri, errmsg: logger.info(
-                'Callback->Connection lost to [%s]: %s', uri, errmsg))
+            lambda uri, errmsg: logger.info('Callback->Connection lost to [%s]: %s', uri, errmsg))
         self.connection_failed.add_callback(
-            lambda uri, errmsg: logger.info(
-                'Callback->Connected failed to [%s]: %s', uri, errmsg))
+            lambda uri, errmsg: logger.info('Callback->Connected failed to [%s]: %s', uri, errmsg))
         self.connection_requested.add_callback(
-            lambda uri: logger.info(
-                'Callback->Connection initialized[%s]', uri))
+            lambda uri: logger.info('Callback->Connection initialized[%s]', uri))
         self.connected.add_callback(
-            lambda uri: logger.info(
-                'Callback->Connection setup finished [%s]', uri))
+            lambda uri: logger.info('Callback->Connection setup finished [%s]', uri))
+        self.fully_connected.add_callback(
+            lambda uri: logger.info('Callback->Connection completed [%s]', uri))
 
     def _disconnected(self, link_uri):
         """ Callback when disconnected."""
@@ -178,6 +184,11 @@ class Crazyflie():
         """Called when the log TOC has been fully updated"""
         logger.info('Log TOC finished updating')
         self.mem.refresh(self._mems_updated_cb)
+
+    def _all_parameters_updated(self):
+        """Called when all parameters have been updated"""
+        logger.info('All parameters updated')
+        self.fully_connected.call(self.link_uri)
 
     def _link_error_cb(self, errmsg):
         """Called from the link driver when there's an error"""
@@ -227,6 +238,8 @@ class Crazyflie():
                 logger.warning(message)
                 self.connection_failed.call(link_uri, message)
             else:
+                if not self.incoming.is_alive():
+                    self.incoming.start()
                 # Add a callback so we can check that any data is coming
                 # back from the copter
                 self.packet_received.add_callback(
@@ -257,6 +270,7 @@ class Crazyflie():
             self.link = None
         self._answer_patterns = {}
         self.disconnected.call(self.link_uri)
+        self.state = State.DISCONNECTED
 
     """Check if the communication link is open or not."""
 
@@ -302,11 +316,15 @@ class Crazyflie():
         """
         Send a packet through the link interface.
 
-        pk -- Packet to send
-        expect_answer -- True if a packet from the Crazyflie is expected to
-                         be sent back, otherwise false
+        @param pk Packet to send
+        @param expect_answer True if a packet from the Crazyflie is expected to
+                             be sent back, otherwise false
 
         """
+
+        if not pk.is_data_size_valid():
+            raise Exception('Data part of packet is too large')
+
         self._send_lock.acquire()
         if self.link is not None:
             if len(expected_reply) > 0 and not resend and \
@@ -338,6 +356,9 @@ class Crazyflie():
             self.link.send_packet(pk)
             self.packet_sent.call(pk)
         self._send_lock.release()
+
+    def is_called_by_incoming_handler_thread(self):
+        return current_thread() == self.incoming
 
 
 _CallbackContainer = namedtuple('CallbackConstainer',

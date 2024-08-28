@@ -12,7 +12,17 @@ venv*
 .project
 .pydevproject
 .settings/*
+.idea/
 
 #jekyll generated pages
 docs/.jekyll-metadata
-.idea/
+docs/api/cflib/*
+
+# Generated documentation
+tools/build-docs/.local
+tools/build-docs/.cache
+docs/api/cflib
+!docs/api/cflib/index.md
+
+#vscode config folder
+.vscode/

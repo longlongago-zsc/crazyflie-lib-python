@@ -19,10 +19,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Simple example that connects to one crazyflie, sets the initial position/yaw
 and flies a trajectory.
@@ -43,9 +41,10 @@ from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie.syncLogger import SyncLogger
+from cflib.utils import uri_helper
 
 # URI to the Crazyflie to connect to
-uri = 'radio://0/80/2M'
+uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
 
 # Change the sequence according to your setup
 #             x    y    z
@@ -131,13 +130,16 @@ def run_sequence(scf, sequence, base_x, base_y, base_z, yaw):
             time.sleep(0.1)
 
     cf.commander.send_stop_setpoint()
+    # Hand control over to the high level commander to avoid timeout and locking of the Crazyflie
+    cf.commander.send_notify_setpoint_stop()
+
     # Make sure that the last packet leaves before the link is closed
     # since the message queue is not flushed before closing
     time.sleep(0.1)
 
 
 if __name__ == '__main__':
-    cflib.crtp.init_drivers(enable_debug_driver=False)
+    cflib.crtp.init_drivers()
 
     # Set these to the position and yaw based on how your Crazyflie is placed
     # on the floor

@@ -20,10 +20,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Access the TOC cache for reading/writing. It supports both user
 cache and dist cache.
@@ -100,13 +98,20 @@ class TocCache():
 
     def _encoder(self, obj):
         """ Encode a toc element leaf-node """
-        return {'__class__': obj.__class__.__name__,
-                'ident': obj.ident,
-                'group': obj.group,
-                'name': obj.name,
-                'ctype': obj.ctype,
-                'pytype': obj.pytype,
-                'access': obj.access}
+        encoded = {
+            '__class__': obj.__class__.__name__,
+            'ident': obj.ident,
+            'group': obj.group,
+            'name': obj.name,
+            'ctype': obj.ctype,
+            'pytype': obj.pytype,
+            'access': obj.access,
+        }
+
+        if isinstance(obj, ParamTocElement):
+            encoded['extended'] = obj.extended
+
+        return encoded
         raise TypeError(repr(obj) + ' is not JSON serializable')
 
     def _decoder(self, obj):
@@ -119,5 +124,7 @@ class TocCache():
             elem.ctype = str(obj['ctype'])
             elem.pytype = str(obj['pytype'])
             elem.access = obj['access']
+            if isinstance(elem, ParamTocElement):
+                elem.extended = obj['extended']
             return elem
         return obj

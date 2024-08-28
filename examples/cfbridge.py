@@ -3,8 +3,8 @@
 Bridge a Crazyflie connected to a Crazyradio to a local MAVLink port
 Requires 'pip install cflib'
 
-As the ESB protocol works using PTX and PRX (Primary Transmitter/Reciever)
-modes. Thus, data is only recieved as a response to a sent packet.
+As the ESB protocol works using PTX and PRX (Primary Transmitter/Receiver)
+modes. Thus, data is only received as a response to a sent packet.
 So, we need to constantly poll the receivers for bidirectional communication.
 
 @author: Dennis Shtatnov (densht@gmail.com)
@@ -42,7 +42,7 @@ class RadioBridge:
         self._cf = Crazyflie()
 
         # Connect some callbacks from the Crazyflie API
-        self._cf.connected.add_callback(self._connected)
+        self._cf.link_established.add_callback(self._connected)
         self._cf.disconnected.add_callback(self._disconnected)
         self._cf.connection_failed.add_callback(self._connection_failed)
         self._cf.connection_lost.add_callback(self._connection_lost)
@@ -91,12 +91,12 @@ class RadioBridge:
         print('Error when logging %s: %s' % (logconf.name, msg))
 
     def _stab_log_data(self, timestamp, data, logconf):
-        """Callback froma the log API when data arrives"""
+        """Callback from a the log API when data arrives"""
         print('[%d][%s]: %s' % (timestamp, logconf.name, data))
 
     def _connection_failed(self, link_uri, msg):
         """Callback when connection initial connection fails (i.e no Crazyflie
-        at the speficied address)"""
+        at the specified address)"""
         print('Connection to %s failed: %s' % (link_uri, msg))
         self.is_connected = False
 
@@ -112,30 +112,18 @@ class RadioBridge:
 
 
 if __name__ == '__main__':
-    # Initialize the low-level drivers (don't list the debug drivers)
+    # Initialize the low-level drivers
     cflib.crtp.radiodriver.set_retries_before_disconnect(1500)
     cflib.crtp.radiodriver.set_retries(3)
-    cflib.crtp.init_drivers(enable_debug_driver=False)
-    # Scan for Crazyflies and use the first one found
-    print('Scanning interfaces for Crazyflies...')
-    if len(sys.argv) > 2:
-        address = int(sys.argv[2], 16)  # address=0xE7E7E7E7E7
+    cflib.crtp.init_drivers()
+
+    if len(sys.argv) > 1:
+        channel = str(sys.argv[1])
     else:
-        address = None
+        channel = 80
 
-    available = cflib.crtp.scan_interfaces(address)
-    print('Crazyflies found:')
-    for i in available:
-        print(i[0])
-
-    if len(available) > 0:
-        if len(sys.argv) > 1:
-            channel = str(sys.argv[1])
-        else:
-            channel = 80
-
-        link_uri = 'radio://0/' + str(channel) + '/2M'
-        le = RadioBridge(link_uri)  # (available[0][0])
+    link_uri = 'radio://0/' + str(channel) + '/2M'
+    le = RadioBridge(link_uri)
 
     # The Crazyflie lib doesn't contain anything to keep the application alive,
     # so this is where your application should do something. In our case we

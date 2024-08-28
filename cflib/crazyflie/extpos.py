@@ -7,7 +7,7 @@
 #  +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
 #   ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
 #
-#  Copyright (C) 2011-2013 Bitcraze AB
+#  Copyright (C) 2011-2020 Bitcraze AB
 #
 #  Crazyflie Nano Quadcopter Client
 #
@@ -20,10 +20,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 Used for sending external position to the Crazyflie
 """
@@ -50,3 +48,11 @@ class Extpos():
         """
 
         self._cf.loc.send_extpos([x, y, z])
+
+    def send_extpose(self, x, y, z, qx, qy, qz, qw):
+        """
+        Send the current Crazyflie X, Y, Z position and attitude as a
+        normalized quaternion. This is going to be forwarded to the
+        Crazyflie's position estimator.
+        """
+        self._cf.loc.send_extpose([x, y, z], [qx, qy, qz, qw])

@@ -20,10 +20,8 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA  02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 The Crazyflie Micro Quadcopter library API used to communicate with the
 Crazyflie Micro Quadcopter via a communication link.
@@ -39,16 +37,23 @@ The two main uses-cases are scanning for Crazyflies available on a
 communication link and opening a communication link to a Crazyflie.
 
 Example of scanning for available Crazyflies on all communication links:
+```python
 cflib.crtp.init_drivers()
 available = cflib.crtp.scan_interfaces()
 for i in available:
     print "Found Crazyflie on URI [%s] with comment [%s]"
             % (available[0], available[1])
+```
 
-Example of connecting to a Crazyflie with know URI (radio dongle 0 and
+Example of connecting to a Crazyflie with known URI (radio dongle 0 and
 radio channel 125):
+```python
 cf = Crazyflie()
 cf.open_link("radio://0/125")
 ...
 cf.close_link()
+```
 """
+__pdoc__ = {}
+__pdoc__['cflib.crtp.cflinkcppdriver'] = False
+__pdoc__['cflib.cpx.transports'] = False

@@ -46,8 +46,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # 2、创建一个handler，用于写入日志文件
-fh = logging.FileHandler(__name__ + '_Debug.log')
-fh.setLevel(logging.DEBUG)
+# fh = logging.FileHandler(__name__ + '_Debug.log')
+# fh.setLevel(logging.DEBUG)
 
 # 再创建一个handler，用于输出到控制台
 ch = logging.StreamHandler()
@@ -57,7 +57,7 @@ ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
 
 # 4、给handler添加formatter
-fh.setFormatter(formatter)
+# fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 
 # 5、给logger添加handler
@@ -81,6 +81,7 @@ class UdpDriver(CRTPDriver):
             raise WrongUriType('Not an UDP URI')
 
         self.socket = socket(AF_INET, SOCK_DGRAM)
+        self.socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.addr = ('192.168.43.42', 2390)  #  The destination IP and port
         self.socket.bind(('', 2399))
         self.socket.connect(self.addr)
@@ -120,11 +121,14 @@ class UdpDriver(CRTPDriver):
 
             pk = CRTPPacket(data[0], list(data[1:]))
 
-            '''self.link_keep_alive += 1
+            self.link_keep_alive += 1
             if self.link_keep_alive > 10:
                 str1 = b'\xFF\x01\x01\x01'
-                self.socket.sendto(str1, self.addr)
-                self.link_keep_alive = 0'''
+                try:
+                    self.socket.sendto(str1, self.addr)
+                except OSError:
+                    logger.warning("Socket error")
+                self.link_keep_alive = 0
 
             # print the raw date
             if self.debug:
@@ -146,7 +150,10 @@ class UdpDriver(CRTPDriver):
         # change the tuple to bytes
         raw = bytearray(raw)
         # logger.debug("send: {}".format(binascii.hexlify(raw)))
-        self.socket.sendto(raw, self.addr)
+        try:
+            self.socket.sendto(raw, self.addr)
+        except OSError:
+            logger.warning("Socket error")
         self.link_keep_alive = 0
         # print the raw date
         if self.debug:
@@ -156,7 +163,10 @@ class UdpDriver(CRTPDriver):
     def close(self):
         str1 = b'\xFF\x01\x01\x01'
         # Remove this from the server clients list
-        self.socket.sendto(str1, self.addr)
+        try:
+            self.socket.sendto(str1, self.addr)
+        except OSError:
+            logger.warning("Socket error")
         if self.debug:
             logger.debug("Disconnected from UDP server")
             logger.debug("send: {}".format(binascii.hexlify(bytearray(str1))))

@@ -343,17 +343,21 @@ class Crazyflie():
                 pattern = expected_reply
                 if pattern in self._answer_patterns:
                     logger.debug('We want to resend and the pattern is there')
-                    if self._answer_patterns[pattern]:
-                        new_timer = Timer(timeout,
-                                          lambda:
-                                          self._no_answer_do_retry(
-                                              pk, pattern))
-                        self._answer_patterns[pattern] = new_timer
-                        new_timer.start()
+                    try:
+                        if self._answer_patterns[pattern]:
+                            new_timer = Timer(timeout,
+                                              lambda:
+                                              self._no_answer_do_retry(
+                                                  pk, pattern))
+                            self._answer_patterns[pattern] = new_timer
+                            new_timer.start()
+                    except KeyError as ex:
+                        logger.debug('No answer received for pattern %s', pattern)
                 else:
                     logger.debug('Resend requested, but no pattern found: %s',
                                  self._answer_patterns)
-            self.link.send_packet(pk)
+            if self.link:
+                self.link.send_packet(pk)
             self.packet_sent.call(pk)
         self._send_lock.release()
 

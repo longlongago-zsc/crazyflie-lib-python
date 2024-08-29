@@ -67,9 +67,8 @@ class LogConfigReader():
         self._cf.connected.add_callback(self._connected)
 
     def get_icons(self):
-        client_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                      os.pardir))
-        icon_path = os.path.join(client_path, 'ui', 'icons')
+        #  client_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+        #  icon_path = os.path.join(client_path, 'ui', 'icons')
         save_icon = ''  # QtGui.QIcon(os.path.join(icon_path, 'create.png'))
         delete_icon = ''  # QtGui.QIcon(os.path.join(icon_path, 'delete.png'))
         return save_icon, delete_icon

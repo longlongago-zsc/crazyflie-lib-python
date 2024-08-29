@@ -3,7 +3,7 @@
     "input_device": "",
     "link_uri": "udp://192.168.43.42",
     "flightmode": "Advanced",
-    "open_tabs": "Flight Control,Log Blocks,Parameters",
+    "open_tabs": "Flight Control",
     "trim_pitch": 0.0,
     "slew_limit": 45,
     "slew_rate": 30,

@@ -117,15 +117,10 @@ class CrazyflieLibWrapper:
 
         if self.uiState == UIState.CONNECTED:
             motors = [data[self.LOG_NAME_MOTOR_1], data[self.LOG_NAME_MOTOR_2],
-                      data[self.LOG_NAME_MOTOR_3], data[self.LOG_NAME_MOTOR_4]]
-            msg = {'cmd': 'motor', 'data': motors, 'status': 0}
+                      data[self.LOG_NAME_MOTOR_3], data[self.LOG_NAME_MOTOR_4],
+                      data[self.LOG_NAME_THRUST], data[self.LOG_NAME_CAN_FLY]]
+            msg = {'cmd': 'Motors', 'data': motors, 'status': 0}
             send_queue.put(msg)
-
-            msg1 = {'cmd': 'thrust', 'data': [data[self.LOG_NAME_THRUST]], 'status': 0}
-            send_queue.put(msg1)
-
-            msg2 = {'cmd': 'canfly', 'data': [data[self.LOG_NAME_CAN_FLY]], 'status': 0}
-            send_queue.put(msg2)
 
             '''self.estimateThrust.setText(
                 "%.2f%%" % self.thrustToPercentage(data[self.LOG_NAME_THRUST]))'''
@@ -176,7 +171,7 @@ class CrazyflieLibWrapper:
 
     def _update_battery(self, timestamp, data, logconf):
         global send_queue
-        msg = {'cmd': 'pm', 'data': [data["pm.vbat"], data["pm.state"]], 'status': 0}
+        msg = {'cmd': 'Battery', 'data': [data["pm.vbat"], data["pm.state"]], 'status': 0}
         send_queue.put(msg)
 
         # logger.debug('_update_battery:%d', (int(data["pm.vbat"] * 1000)))
@@ -230,8 +225,13 @@ class CrazyflieLibWrapper:
         logger.debug("_connection_failed")
 
     def connect(self):
-        self._connect()
-        logger.debug(("connect url:%s" % self.link_url))
+        global send_queue
+        if self.uiState == UIState.CONNECTED:
+            msg = {'cmd': 'connect', 'data': [self.uiState], 'status': 0}
+            send_queue.put(msg)
+        else:
+            self._connect()
+            logger.debug(("connect url:%s" % self.link_url))
 
     def disconnect(self):
         Config().save_file()

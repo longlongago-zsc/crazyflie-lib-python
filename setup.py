@@ -37,8 +37,8 @@ setup(
     keywords='driver crazyflie quadcopter',
 
     install_requires=[
-        'pyusb>=1.0.0b2',
-        'libusb-package~=1.0',
+        # 'pyusb>=1.0.0b2',
+        # 'libusb-package~=1.0',
         'scipy~=1.7',
         'numpy~=1.20',
     ],

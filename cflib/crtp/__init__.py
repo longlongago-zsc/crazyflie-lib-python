@@ -25,14 +25,15 @@
 """Scans and creates communication interfaces."""
 import logging
 import os
-
+'''
 from .exceptions import WrongUriType
 from .prrtdriver import PrrtDriver
 from .radiodriver import RadioDriver
 from .serialdriver import SerialDriver
 from .tcpdriver import TcpDriver
-from .udpdriver import UdpDriver
 from .usbdriver import UsbDriver
+'''
+from .udpdriver import UdpDriver
 
 __author__ = 'Bitcraze AB'
 __all__ = []

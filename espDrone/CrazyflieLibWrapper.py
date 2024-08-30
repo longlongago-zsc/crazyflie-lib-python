@@ -256,7 +256,7 @@ def udpSendhandle(udp_socket, crazyflie, pc_address):
             msg = send_queue.get(timeout = 10)
         except :
             if crazyflie.uiState == UIState.CONNECTED:
-                msg = {'cmd': 'estimate', 'data': [0,0,0,0,0,0], 'status': 1}
+                msg = {'cmd': 'connect', 'data': [UIState.DISCONNECTED], 'status': 0}
         if msg:
             logger.debug('send msg:{0}'.format(msg))
             json_data = json.dumps(msg)

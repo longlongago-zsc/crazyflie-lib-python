@@ -1,1 +1,1 @@
-pyinstaller CrazyflieLibWrapper.py -F  -p D:\longlongago\crazyflie-lib-python\cflib;D:\longlongago\crazyflie-lib-python\espDrone -i bitcraze.ico
+pyinstaller CrazyflieLibWrapper.py -F  -p D:\longlongago\crazyflie-lib-python\cflib;D:\longlongago\crazyflie-lib-python\espDrone -i bitcraze.ico -n espDrone

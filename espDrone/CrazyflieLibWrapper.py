@@ -1,5 +1,6 @@
 import logging
 import time
+from enum import Enum
 
 import cflib.crtp
 import espDrone
@@ -32,6 +33,25 @@ class UIState:
     CONNECTED = 2
     SCANNING = 3
 
+class CmdEnum():
+    UNKNOWN = 0
+    CONNECT = 1
+    DISCONNECT = 2
+    QUIT = 3
+    ESTIMATE = 4
+    MOTORS = 5
+    BATTERY = 6
+    BAROMETER = 7
+
+CmdDict = {
+    CmdEnum.UNKNOWN: 'Unknown',
+    CmdEnum.DISCONNECT: 'disconnect',
+    CmdEnum.CONNECT:'connect',
+    CmdEnum.ESTIMATE:'estimate',
+    CmdEnum.MOTORS:'motor',
+    CmdEnum.BATTERY:'battery',
+    CmdEnum.QUIT:'quit'
+}
 
 class BatteryStates:
     BATTERY, CHARGING, CHARGED, LOW_POWER = list(range(4))
@@ -46,6 +66,11 @@ class CrazyflieLibWrapper:
     LOG_NAME_MOTOR_4 = 'motor.m4'
     LOG_NAME_CAN_FLY = 'sys.canfly'
 
+    # barometer
+    LOG_NAME_ASL = 'baro.asl'
+    LOG_NAME_PRESSURE = 'baro.pressure'
+    LOG_NAME_TEMP = 'baro.temp'
+
     LINK_URL = "udp://192.168.43.42"
 
     def __init__(self):
@@ -58,8 +83,9 @@ class CrazyflieLibWrapper:
 
         cflib.crtp.init_drivers()
 
-        # Connection callbacks and signal wrappers for UI protection
+        # Connect some callbacks from the Crazyflie API
         self.cf.connected.add_callback(self._connected)
+        self.cf.fully_connected.add_callback(self._fully_connected)
         self.cf.disconnected.add_callback(self._disconnected)
         self.cf.connection_lost.add_callback(self._connection_lost)
         self.cf.connection_requested.add_callback(self._connection_initiated)
@@ -97,7 +123,7 @@ class CrazyflieLibWrapper:
                                  self.estimateRoll, self.estimatePitch,  self.estimateYaw))'''
 
             msg = {
-                'cmd': 'estimate',
+                'cmd': CmdEnum.ESTIMATE,
                 'data': [self.estimateX, self.estimateY, self.estimateZ,
                         self.estimateRoll, self.estimatePitch, self.estimateYaw] ,
                 'status':0
@@ -119,7 +145,7 @@ class CrazyflieLibWrapper:
             motors = [data[self.LOG_NAME_MOTOR_1], data[self.LOG_NAME_MOTOR_2],
                       data[self.LOG_NAME_MOTOR_3], data[self.LOG_NAME_MOTOR_4],
                       data[self.LOG_NAME_THRUST], data[self.LOG_NAME_CAN_FLY]]
-            msg = {'cmd': 'Motors', 'data': motors, 'status': 0}
+            msg = {'cmd': CmdEnum.MOTORS, 'data': motors, 'status': 0}
             send_queue.put(msg)
 
             '''self.estimateThrust.setText(
@@ -129,12 +155,16 @@ class CrazyflieLibWrapper:
                 self._can_fly_deprecated = data[self.LOG_NAME_CAN_FLY]
                 self._update_flight_commander(True)'''
 
+    def _fully_connected(self, link_uri):
+        """This callback is called when the Crazyflie has been connected and all parameters have been
+                downloaded. It is now OK to set and get parameters."""
+        logger.debug(f'Parameters downloaded to {link_uri}')
 
     def _connected(self, url):
         self.uiState = UIState.CONNECTED
 
         global send_queue
-        msg = {'cmd': 'connect', 'data': [self.uiState], 'status': 0}
+        msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': 0}
         send_queue.put(msg)
 
         Config().set("link_uri", str(self.link_url))
@@ -169,9 +199,28 @@ class CrazyflieLibWrapper:
         except AttributeError as e:
             logger.warning(str(e))
 
+        #barometer
+        lg = LogConfig("Barometer", 70)
+        lg.add_variable(self.LOG_NAME_ASL, "float")
+        lg.add_variable(self.LOG_NAME_PRESSURE, "float")
+        lg.add_variable(self.LOG_NAME_TEMP, "float")
+        try:
+            self.cf.log.add_config(lg)
+            lg.data_received_cb.add_callback(self._barometer_data_receviced)
+            lg.error_cb.add_callback(self._logging_error)
+            lg.start()
+        except Exception as e:
+            logger.warning(str(e))
+
+    def _barometer_data_receviced(self, timestamp, data, logconf):
+        global send_queue
+        msg = {'cmd': CmdEnum.BAROMETER, 'data': [data[self.LOG_NAME_ASL], data[self.LOG_NAME_PRESSURE], data[self.LOG_NAME_PRESSURE]], 'status': 0}
+        send_queue.put(msg)
+
+
     def _update_battery(self, timestamp, data, logconf):
         global send_queue
-        msg = {'cmd': 'Battery', 'data': [data["pm.vbat"], data["pm.state"]], 'status': 0}
+        msg = {'cmd': CmdEnum.BATTERY, 'data': [data["pm.vbat"], data["pm.state"]], 'status': 0}
         send_queue.put(msg)
 
         # logger.debug('_update_battery:%d', (int(data["pm.vbat"] * 1000)))
@@ -191,13 +240,13 @@ class CrazyflieLibWrapper:
     def _disconnected(self, link_uri):
         self.uiState = UIState.DISCONNECTED
         global send_queue
-        msg = {'cmd': 'connect', 'data': [self.uiState], 'status': 0}
+        msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': 0}
         send_queue.put(msg)
 
     def _connection_initiated(self, url):
         self.uiState = UIState.CONNECTING
         global send_queue
-        msg = {'cmd': 'connect', 'data': [self.uiState], 'status': 0}
+        msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': 0}
         send_queue.put(msg)
         logger.debug("_connection_initiated")
 
@@ -213,21 +262,21 @@ class CrazyflieLibWrapper:
     def _connection_lost(self, linkURI, msg):
         self.uiState = UIState.DISCONNECTED
         global send_queue
-        msg = {'cmd': 'connect', 'data': [self.uiState], 'status': 1}
+        msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': 1}
         send_queue.put(msg)
         logger.debug("_connection_lost")
 
     def _connection_failed(self, linkURI, error):
         self.uiState = UIState.DISCONNECTED
         global send_queue
-        msg = {'cmd': 'connect', 'data': [self.uiState], 'status': 1}
+        msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': 1}
         send_queue.put(msg)
         logger.debug("_connection_failed")
 
     def connect(self):
         global send_queue
         if self.uiState == UIState.CONNECTED:
-            msg = {'cmd': 'connect', 'data': [self.uiState], 'status': 0}
+            msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': 0}
             send_queue.put(msg)
         else:
             self._connect()
@@ -256,7 +305,7 @@ def udpSendhandle(udp_socket, crazyflie, pc_address):
             msg = send_queue.get(timeout = 10)
         except :
             if crazyflie.uiState == UIState.CONNECTED:
-                msg = {'cmd': 'connect', 'data': [UIState.DISCONNECTED], 'status': 0}
+                msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.DISCONNECTED], 'status': 0}
         if msg:
             logger.debug('send msg:{0}'.format(msg))
             json_data = json.dumps(msg)
@@ -279,7 +328,8 @@ def udpReceivehandle(udp_socket, crazyflie):
             data, addr = udp_socket.recvfrom(1024)
         except OSError:
                 logger.debug("udpReceivehandle Socket error: socket might be closed.")
-        cmd = ''
+
+        cmd = CmdEnum.UNKNOWN
 
         try:
             if data:
@@ -298,33 +348,30 @@ def udpReceivehandle(udp_socket, crazyflie):
 
                 jsonObj = json.loads(strs)
                 logger.debug('recv data:%s' % jsonObj)
-                cmd = jsonObj.get('cmd')
+                cmd = jsonObj.get('cmd', CmdEnum.UNKNOWN)
         except Exception:
             logger.debug("recv data to json error")
 
-        logger.debug('recv cmd: %s' % cmd)
+        logger.debug('recv cmd: %d<--->%s' % (cmd, CmdDict.get(cmd , 'UNKNOWN')))
 
-        if cmd:
-            if (cmd == 'quit'):
-                crazyflie.disconnect()
-                msg = {'cmd': cmd, 'data': [0], 'status': 0}
-                send_queue.put(msg)
-                time.sleep(0.01)
-                is_quit = True
-                send_queue.put(msg)
-            elif cmd == 'disconnect':
-                crazyflie.disconnect()
-            elif cmd == 'connect':
-                try:
-                    crazyflie.connect()
-                except Exception:
-                    msg = {'cmd': 'connect', 'data': [crazyflie.uiState], 'status': 1}
-                    send_queue.put(msg)
-            else:
-                msg = {'cmd': 'unknown', 'data': [0], 'status': 1}
+        if (cmd == CmdEnum.QUIT):
+            crazyflie.disconnect()
+            msg = {'cmd': CmdEnum.QUIT, 'data': [0], 'status': 0}
+            send_queue.put(msg)
+            time.sleep(0.01)
+            is_quit = True
+            send_queue.put(msg)
+        elif cmd == CmdEnum.DISCONNECT:
+            crazyflie.disconnect()
+        elif cmd == CmdEnum.CONNECT:
+            try:
+                crazyflie.connect()
+            except Exception:
+                msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.DISCONNECTED], 'status': 1}
                 send_queue.put(msg)
         else:
-            time.sleep(0.01)
+            msg = {'cmd': CmdEnum.UNKNOWN, 'data': [0], 'status': 1}
+            send_queue.put(msg)
 
     crazyflie.disconnect()
 

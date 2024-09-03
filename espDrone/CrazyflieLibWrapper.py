@@ -42,6 +42,8 @@ class CmdEnum():
     MOTORS = 5
     BATTERY = 6
     BAROMETER = 7
+    MAGNETOMETER = 8
+    ACC = 9
 
 CmdDict = {
     CmdEnum.UNKNOWN: 'Unknown',
@@ -70,6 +72,16 @@ class CrazyflieLibWrapper:
     LOG_NAME_ASL = 'baro.asl'
     LOG_NAME_PRESSURE = 'baro.pressure'
     LOG_NAME_TEMP = 'baro.temp'
+
+    # magnetometer
+    LOG_NAME_MAG_X = 'mag.x'
+    LOG_NAME_MAG_Y = 'mag.y'
+    LOG_NAME_MAG_Z = 'mag.z'
+
+    #acc
+    LOG_NAME_ACC_X = 'acc.x'
+    LOG_NAME_ACC_Y = 'acc.y'
+    LOG_NAME_ACC_Z = 'acc.z'
 
     LINK_URL = "udp://192.168.43.42"
 
@@ -155,11 +167,6 @@ class CrazyflieLibWrapper:
                 self._can_fly_deprecated = data[self.LOG_NAME_CAN_FLY]
                 self._update_flight_commander(True)'''
 
-    def _fully_connected(self, link_uri):
-        """This callback is called when the Crazyflie has been connected and all parameters have been
-                downloaded. It is now OK to set and get parameters."""
-        logger.debug(f'Parameters downloaded to {link_uri}')
-
     def _connected(self, url):
         self.uiState = UIState.CONNECTED
 
@@ -180,41 +187,19 @@ class CrazyflieLibWrapper:
         except KeyError as e:
             logger.warning(str(e))
 
-        # MOTOR & THRUST
-        lg = LogConfig("Motors", 100)
-        lg.add_variable(self.LOG_NAME_THRUST, "uint16_t")
-        lg.add_variable(self.LOG_NAME_MOTOR_1)
-        lg.add_variable(self.LOG_NAME_MOTOR_2)
-        lg.add_variable(self.LOG_NAME_MOTOR_3)
-        lg.add_variable(self.LOG_NAME_MOTOR_4)
-        lg.add_variable(self.LOG_NAME_CAN_FLY)
+    def _acc_data_receviced(self, timestamp, data, logconf):
+        global send_queue
+        msg = {'cmd': CmdEnum.ACC, 'data': [data[self.LOG_NAME_ACC_X], data[self.LOG_NAME_ACC_Y], data[self.LOG_NAME_ACC_Z]], 'status': 0}
+        send_queue.put(msg)
 
-        try:
-            self.cf.log.add_config(lg)
-            lg.data_received_cb.add_callback(self._log_data_received)
-            lg.error_cb.add_callback(self._logging_error)
-            lg.start()
-        except KeyError as e:
-            logger.warning(str(e))
-        except AttributeError as e:
-            logger.warning(str(e))
-
-        #barometer
-        lg = LogConfig("Barometer", 70)
-        lg.add_variable(self.LOG_NAME_ASL, "float")
-        lg.add_variable(self.LOG_NAME_PRESSURE, "float")
-        lg.add_variable(self.LOG_NAME_TEMP, "float")
-        try:
-            self.cf.log.add_config(lg)
-            lg.data_received_cb.add_callback(self._barometer_data_receviced)
-            lg.error_cb.add_callback(self._logging_error)
-            lg.start()
-        except Exception as e:
-            logger.warning(str(e))
+    def _magnetometer_data_receviced(self, timestamp, data, logconf):
+        global send_queue
+        msg = {'cmd': CmdEnum.MAGNETOMETER, 'data': [data[self.LOG_NAME_MAG_X], data[self.LOG_NAME_MAG_Y], data[self.LOG_NAME_MAG_Z]], 'status': 0}
+        send_queue.put(msg)
 
     def _barometer_data_receviced(self, timestamp, data, logconf):
         global send_queue
-        msg = {'cmd': CmdEnum.BAROMETER, 'data': [data[self.LOG_NAME_ASL], data[self.LOG_NAME_PRESSURE], data[self.LOG_NAME_PRESSURE]], 'status': 0}
+        msg = {'cmd': CmdEnum.BAROMETER, 'data': [data[self.LOG_NAME_ASL], data[self.LOG_NAME_PRESSURE], data[self.LOG_NAME_TEMP]], 'status': 0}
         send_queue.put(msg)
 
 
@@ -251,31 +236,104 @@ class CrazyflieLibWrapper:
         logger.debug("_connection_initiated")
 
     def _connect(self):
-        if self.uiState == UIState.CONNECTED:
-            self.cf.close_link()
-        elif self.uiState == UIState.CONNECTING:
-            self.cf.close_link()
-            self.uiState = UIState.DISCONNECTED
-        else:
+        if self.uiState == UIState.DISCONNECTED or self.uiState == UIState.SCANNING:
             self.cf.open_link(self.link_url)
+
+    def _fully_connected(self, link_uri):
+        global send_queue
+        """This callback is called when the Crazyflie has been connected and all parameters have been
+                downloaded. It is now OK to set and get parameters."""
+        self.uiState = UIState.CONNECTED
+
+        msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.CONNECTED], 'status': 0}
+        send_queue.put(msg)
+        logger.debug(f'Parameters downloaded to {link_uri}')
+
+        # MOTOR & THRUST
+        lg = LogConfig("Motors", 90)
+        lg.add_variable(self.LOG_NAME_THRUST, "uint16_t")
+        lg.add_variable(self.LOG_NAME_MOTOR_1)
+        lg.add_variable(self.LOG_NAME_MOTOR_2)
+        lg.add_variable(self.LOG_NAME_MOTOR_3)
+        lg.add_variable(self.LOG_NAME_MOTOR_4)
+        lg.add_variable(self.LOG_NAME_CAN_FLY)
+
+        try:
+            self.cf.log.add_config(lg)
+            lg.data_received_cb.add_callback(self._log_data_received)
+            lg.error_cb.add_callback(self._logging_error)
+            lg.start()
+        except KeyError as e:
+            logger.warning(str(e))
+        except AttributeError as e:
+            logger.warning(str(e))
+        except Exception as e:
+            logger.warning(str(e))
+
+        send_queue.put(msg)
+
+        # barometer
+        lg = LogConfig("Barometer", 100)
+        lg.add_variable(self.LOG_NAME_ASL, "float")
+        lg.add_variable(self.LOG_NAME_PRESSURE, "float")
+        lg.add_variable(self.LOG_NAME_TEMP, "float")
+        try:
+            self.cf.log.add_config(lg)
+            lg.data_received_cb.add_callback(self._barometer_data_receviced)
+            lg.error_cb.add_callback(self._logging_error)
+            lg.start()
+        except Exception as e:
+            logger.warning(str(e))
+
+        send_queue.put(msg)
+
+        # barometer
+        lg = LogConfig("Magnetometer", 110)
+        lg.add_variable(self.LOG_NAME_MAG_X, "float")
+        lg.add_variable(self.LOG_NAME_MAG_Y, "float")
+        lg.add_variable(self.LOG_NAME_MAG_Z, "float")
+        try:
+            self.cf.log.add_config(lg)
+            lg.data_received_cb.add_callback(self._magnetometer_data_receviced)
+            lg.error_cb.add_callback(self._logging_error)
+            lg.start()
+        except Exception as e:
+            logger.warning(str(e))
+
+        send_queue.put(msg)
+
+        # acc sensor
+        lg = LogConfig("AccSensor", 120)
+        lg.add_variable(self.LOG_NAME_ACC_X, "float")
+        lg.add_variable(self.LOG_NAME_ACC_Y, "float")
+        lg.add_variable(self.LOG_NAME_ACC_Z, "float")
+        try:
+            self.cf.log.add_config(lg)
+            lg.data_received_cb.add_callback(self._acc_data_receviced)
+            lg.error_cb.add_callback(self._logging_error)
+            lg.start()
+        except Exception as e:
+            logger.warning(str(e))
+
+        send_queue.put(msg)
 
     def _connection_lost(self, linkURI, msg):
         self.uiState = UIState.DISCONNECTED
         global send_queue
-        msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': 1}
+        msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.DISCONNECTED], 'status': 1}
         send_queue.put(msg)
         logger.debug("_connection_lost")
 
     def _connection_failed(self, linkURI, error):
         self.uiState = UIState.DISCONNECTED
         global send_queue
-        msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': 1}
+        msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.DISCONNECTED], 'status': 1}
         send_queue.put(msg)
         logger.debug("_connection_failed")
 
     def connect(self):
         global send_queue
-        if self.uiState == UIState.CONNECTED:
+        if self.uiState == UIState.CONNECTED or self.uiState == UIState.CONNECTING:
             msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': 0}
             send_queue.put(msg)
         else:
@@ -283,8 +341,14 @@ class CrazyflieLibWrapper:
             logger.debug(("connect url:%s" % self.link_url))
 
     def disconnect(self):
-        Config().save_file()
+        global send_queue
+
         self.cf.close_link()
+
+        self.uiState = UIState.DISCONNECTED
+        msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.DISCONNECTED], 'status': 0}
+        send_queue.put(msg)
+
         logger.debug(("disconnect url:%s" % self.link_url))
 
     def set_param(self, name, value):
@@ -302,21 +366,19 @@ def udpSendhandle(udp_socket, crazyflie, pc_address):
     msg = ''
     while not is_quit:
         try:
-            msg = send_queue.get(timeout = 10)
-        except :
-            if crazyflie.uiState == UIState.CONNECTED:
-                msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.DISCONNECTED], 'status': 0}
+            msg = send_queue.get(block = True, timeout = 30)
+        except Exception as e:
+            if crazyflie.uiState == UIState.CONNECTED or crazyflie.uiState == UIState.CONNECTING:
+                logger.debug('disconnect:{0}'.format(e))
+                crazyflie.disconnect()
         if msg:
-            logger.debug('send msg:{0}'.format(msg))
+            # logger.debug('send msg:{0}'.format(msg))
             json_data = json.dumps(msg)
             bytes_data  = json_data.encode('utf-8')
             try:
                 udp_socket.sendto(bytes_data , pc_address)
             except Exception as e:
-                logger.debug("udpSendhandle Socket error: socket might be closed. because:{0}".format(e))
-                time.sleep(0.01)
-        else:
-            time.sleep(0.01)
+                logger.debug('udpSendhandle Socket error: socket might be closed. because:{0}'.format(e))
 
 def udpReceivehandle(udp_socket, crazyflie):
     global recv_queue
@@ -373,6 +435,7 @@ def udpReceivehandle(udp_socket, crazyflie):
             msg = {'cmd': CmdEnum.UNKNOWN, 'data': [0], 'status': 1}
             send_queue.put(msg)
 
+    Config().save_file()
     crazyflie.disconnect()
 
 

@@ -31,10 +31,12 @@ import re
 import binascii
 import time
 from socket import *
+import traceback
 
 from .crtpdriver import CRTPDriver
 from .crtpstack import CRTPPacket
 from .exceptions import WrongUriType
+from cflib.utils.callbacks import Caller
 
 __author__ = 'Bitcraze AB'
 __all__ = ['UdpDriver']
@@ -69,8 +71,8 @@ class UdpDriver(CRTPDriver):
 
     def __init__(self):
         self.debug = True
-        self.link_error_callback = None
-        self.link_quality_callback = None
+        self.link_error_callback = Caller()
+        self.link_quality_callback = Caller()
         self.needs_resending = True
         self.link_keep_alive = 0  # keep alive when no input device
         None
@@ -80,6 +82,8 @@ class UdpDriver(CRTPDriver):
         if not re.search('^udp://', uri):
             raise WrongUriType('Not an UDP URI')
 
+        self.link_error_callback = linkErrorCallback
+        self.link_quality_callback = linkQualityCallback
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.addr = ('192.168.43.42', 2390)  #  The destination IP and port
@@ -95,7 +99,11 @@ class UdpDriver(CRTPDriver):
     def receive_packet(self, time=0):
         try:
             data, addr = self.socket.recvfrom(1024)
-        except OSError:
+        except BaseException as e:
+            if self.link_error_callback:
+                self.link_error_callback(
+                    'Error communicating with the Crazyflie\n'
+                    'Exception:%s\n\n%s\n\n' % (e, traceback.format_exc()))
             if self.debug:
                 logger.debug("Socket error: socket might be closed.")
             return None
@@ -122,7 +130,7 @@ class UdpDriver(CRTPDriver):
             pk = CRTPPacket(data[0], list(data[1:]))
 
             self.link_keep_alive += 1
-            if self.link_keep_alive > 10:
+            if self.link_keep_alive > 5:
                 str1 = b'\xFF\x01\x01\x01'
                 try:
                     self.socket.sendto(str1, self.addr)
@@ -156,9 +164,9 @@ class UdpDriver(CRTPDriver):
             logger.warning("Socket error")
         self.link_keep_alive = 0
         # print the raw date
-        if self.debug:
+        # if self.debug:
             # logger.debug("send: {}".format(binascii.hexlify(raw)))
-            pass
+        #    pass
 
     def close(self):
         str1 = b'\xFF\x01\x01\x01'

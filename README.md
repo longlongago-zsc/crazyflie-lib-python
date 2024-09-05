@@ -10,7 +10,7 @@ In this fork, the cflib is used to communicate with the [udp-dev](https://github
 To install the modified cflib for esp-drone, you can follow the instructions below.
 
 ```bash
-  pip install git+https://github.com/longlongago-zsc/crazyflie-lib-python.git)
+  pip install git+https://github.com/longlongago-zsc/crazyflie-lib-python.git
 ```
 ## Using the GUI tools for esp-drone
 

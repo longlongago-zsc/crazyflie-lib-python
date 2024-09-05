@@ -404,7 +404,11 @@ class _IncomingPacketHandler(Thread):
             if self.cf.link is None:
                 time.sleep(1)
                 continue
-            pk = self.cf.link.receive_packet(1)
+            try :
+                pk = self.cf.link.receive_packet(1)
+            except AttributeError:
+                time.sleep(1)
+                continue
 
             if pk is None:
                 continue

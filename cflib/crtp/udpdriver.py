@@ -29,9 +29,14 @@ See udpserver.py for the protocol"""
 
 import re
 import binascii
+import threading
 import time
 from socket import *
 import traceback
+
+import queue
+keep_live_queue = queue.Queue()
+is_connected = False
 
 from .crtpdriver import CRTPDriver
 from .crtpstack import CRTPPacket
@@ -66,6 +71,21 @@ ch.setFormatter(formatter)
 # logger.addHandler(fh)
 logger.addHandler(ch)
 
+def _send_packet(send_socket, addr):
+    global keep_live_queue
+    global is_connected
+    msg = b'\xFF\x01\x01\x01'
+    while is_connected:
+        try:
+            msg = keep_live_queue.get(timeout=0.02)
+        except queue.Empty:
+            msg = b'\xFF\x01\x01\x01'
+        # logger.debug("send: {}".format(binascii.hexlify(raw)))
+        try:
+            send_socket.sendto(msg, addr)
+        except OSError:
+            logger.warning("Socket error")
+            # is_connected = False
 
 class UdpDriver(CRTPDriver):
 
@@ -74,10 +94,9 @@ class UdpDriver(CRTPDriver):
         self.link_error_callback = Caller()
         self.link_quality_callback = Caller()
         self.needs_resending = True
-        self.link_keep_alive = 0  # keep alive when no input device
-        None
 
     def connect(self, uri, linkQualityCallback, linkErrorCallback):
+        global is_connected
         # check if the URI is a radio URI
         if not re.search('^udp://', uri):
             raise WrongUriType('Not an UDP URI')
@@ -86,24 +105,23 @@ class UdpDriver(CRTPDriver):
         self.link_quality_callback = linkQualityCallback
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        self.addr = ('192.168.43.42', 2390)  #  The destination IP and port
+        self.addr = (uri.split('udp://')[1], 2390)  #  The destination IP and port '192.168.43.42'
         self.socket.bind(('', 2399))
         self.socket.connect(self.addr)
-        str1 = b'\xFF\x01\x01\x01'
-        # Add this to the server clients list
-        self.socket.sendto(str1, self.addr)
+        is_connected = True
+        threading.Thread(target=_send_packet, args=(self.socket, self.addr)).start()
         if self.debug:
             logger.debug("Connected to UDP server")
-            logger.debug("send: {}".format(binascii.hexlify(bytearray(str1))))
 
     def receive_packet(self, time=0):
+        global is_connected
         try:
             data, addr = self.socket.recvfrom(1024)
         except BaseException as e:
+            is_connected = False
             if self.link_error_callback:
                 self.link_error_callback(
-                    'Error communicating with the Crazyflie\n'
-                    'Exception:%s\n\n%s\n\n' % (e, traceback.format_exc()))
+                    'Error communicating with the Crazyflie. Socket error: socket might be closed.')
             if self.debug:
                 logger.debug("Socket error: socket might be closed.")
             return None
@@ -118,10 +136,10 @@ class UdpDriver(CRTPDriver):
             for i in data[0:]:
                 cksum += i
             cksum %= 256
-            if self.debug:
-                #raw = bytearray(data)
-                #logger.debug("recv: {}".format(binascii.hexlify(bytearray(raw))))
-                pass
+            # if self.debug:
+                # raw = bytearray(data)
+                # logger.debug("recv: {}".format(binascii.hexlify(bytearray(raw))))
+                # pass
             if cksum != cksum_recv:
                 if self.debug:
                     logger.debug("Checksum error {} != {}".format(cksum, cksum_recv))
@@ -129,24 +147,16 @@ class UdpDriver(CRTPDriver):
 
             pk = CRTPPacket(data[0], list(data[1:]))
 
-            self.link_keep_alive += 1
-            if self.link_keep_alive > 5:
-                str1 = b'\xFF\x01\x01\x01'
-                try:
-                    self.socket.sendto(str1, self.addr)
-                except OSError:
-                    logger.warning("Socket error")
-                self.link_keep_alive = 0
-
             # print the raw date
-            if self.debug:
+            #if self.debug:
                 # logger.debug("recv: {}".format(binascii.hexlify(bytearray(data))))
-                pass
+            #    pass
             return pk
         else:
             return None
 
     def send_packet(self, pk):
+        global keep_live_queue
         raw = (pk.header,) + pk.datat
         # logger.debug("send: {}".format(binascii.hexlify(bytearray(raw))))
         cksum = 0
@@ -157,27 +167,12 @@ class UdpDriver(CRTPDriver):
         raw = raw + (cksum,)
         # change the tuple to bytes
         raw = bytearray(raw)
-        # logger.debug("send: {}".format(binascii.hexlify(raw)))
-        try:
-            self.socket.sendto(raw, self.addr)
-        except OSError:
-            logger.warning("Socket error")
-        self.link_keep_alive = 0
-        # print the raw date
-        # if self.debug:
-            # logger.debug("send: {}".format(binascii.hexlify(raw)))
-        #    pass
+        keep_live_queue.put_nowait(raw)
 
     def close(self):
-        str1 = b'\xFF\x01\x01\x01'
+        global is_connected
         # Remove this from the server clients list
-        try:
-            self.socket.sendto(str1, self.addr)
-        except OSError:
-            logger.warning("Socket error")
-        if self.debug:
-            logger.debug("Disconnected from UDP server")
-            logger.debug("send: {}".format(binascii.hexlify(bytearray(str1))))
+        is_connected = False
         time.sleep(1)
         self.socket.close()
 

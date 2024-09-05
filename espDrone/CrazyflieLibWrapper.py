@@ -211,6 +211,7 @@ class CrazyflieLibWrapper:
         # logger.debug('_update_battery:%d', (int(data["pm.vbat"] * 1000)))
         # self.batteryBar.setValue(int(data["pm.vbat"] * 1000))
 
+        '''
         color = 'COLOR_BLUE'
         # TODO firmware reports fully-charged state as 'Battery',
         # rather than 'Charged'
@@ -218,6 +219,7 @@ class CrazyflieLibWrapper:
             color = 'COLOR_GREEN'
         elif data["pm.state"] == BatteryStates.LOW_POWER:
             color = 'COLOR_RED'
+        '''
 
         # self.batteryBar.setStyleSheet(UiUtils.progressbar_stylesheet(color))
         # logger.debug(("_update_battery:%.3f, color:%s" % (data["pm.vbat"], color)))

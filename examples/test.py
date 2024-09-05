@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 #
 #     ||          ____  _ __
 #  +------+      / __ )(_) /_______________ _____  ___
@@ -17,8 +17,10 @@
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <https://www.gnu.org/licenses/>.
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA  02110-1301, USA.
 """
 Simple example that connects to one crazyflie (check the address at the top
 and update it to your crazyflie address) and uses the high level commander
@@ -28,7 +30,6 @@ This example is intended to work with any positioning system (including LPS).
 It aims at documenting how to set the Crazyflie in position control mode
 and how to send setpoints using the high level commander.
 """
-import sys
 import time
 
 import cflib.crtp
@@ -38,10 +39,9 @@ from cflib.crazyflie.mem import MemoryElement
 from cflib.crazyflie.mem import Poly4D
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie.syncLogger import SyncLogger
-from cflib.utils import uri_helper
 
 # URI to the Crazyflie to connect to
-uri = 'udp://192.168.43.42' # uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
+uri = 'udp://192.168.43.42'
 
 # The trajectory to fly
 # See https://github.com/whoenig/uav_trajectories for a tool to generate
@@ -60,6 +60,22 @@ figure8 = [
     [0.710000, -0.923935, 0.447832, 0.627381, -0.259808, -0.042325, -0.032258, 0.001420, 0.005294, 0.288570, 0.873350, -0.515586, -0.730207, -0.026023, 0.288755, 0.215678, -0.148061, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
     [1.053185, -0.398611, 0.850510, -0.144007, -0.485368, -0.079781, 0.176330, 0.234482, -0.153567, 0.447039, -0.532729, -0.855023, 0.878509, 0.775168, -0.391051, -0.713519, 0.391628, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
 ]
+
+
+class Uploader:
+    def __init__(self):
+        self._is_done = False
+
+    def upload(self, trajectory_mem):
+        print('Uploading data')
+        trajectory_mem.write_data(self._upload_done)
+
+        while not self._is_done:
+            time.sleep(0.2)
+
+    def _upload_done(self, mem, addr):
+        print('Data uploaded')
+        self._is_done = True
 
 
 def wait_for_position_estimator(scf):
@@ -111,13 +127,16 @@ def reset_estimator(cf):
     wait_for_position_estimator(cf)
 
 
+def activate_high_level_commander(cf):
+    cf.param.set_value('commander.enHighLevel', '1')
+
+
 def activate_mellinger_controller(cf):
-    cf.param.set_value('stabilizer.controller', '1')
+    cf.param.set_value('stabilizer.controller', '2')
 
 
 def upload_trajectory(cf, trajectory_id, trajectory):
     trajectory_mem = cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
-    trajectory_mem.trajectory = []
 
     total_duration = 0
     for row in trajectory:
@@ -126,14 +145,12 @@ def upload_trajectory(cf, trajectory_id, trajectory):
         y = Poly4D.Poly(row[9:17])
         z = Poly4D.Poly(row[17:25])
         yaw = Poly4D.Poly(row[25:33])
-        trajectory_mem.trajectory.append(Poly4D(duration, x, y, z, yaw))
+        trajectory_mem.poly4Ds.append(Poly4D(duration, x, y, z, yaw))
         total_duration += duration
 
-    upload_result = trajectory_mem.write_data_sync()
-    if not upload_result:
-        print('Upload failed, aborting!')
-        sys.exit(1)
-    cf.high_level_commander.define_trajectory(trajectory_id, 0, len(trajectory_mem.trajectory))
+    Uploader().upload(trajectory_mem)
+    cf.high_level_commander.define_trajectory(trajectory_id, 0,
+                                              len(trajectory_mem.poly4Ds))
     return total_duration
 
 
@@ -143,22 +160,22 @@ def run_sequence(cf, trajectory_id, duration):
     commander.takeoff(1.0, 2.0)
     time.sleep(3.0)
     relative = True
-    commander.start_trajectory(trajectory_id, 1.0, relative)
+    #commander.start_trajectory(trajectory_id, 1.0, relative)
     time.sleep(duration)
     commander.land(0.0, 2.0)
     time.sleep(2)
     commander.stop()
 
-
 if __name__ == '__main__':
-    cflib.crtp.init_drivers()
+    cflib.crtp.init_drivers(enable_debug_driver=False)
+    cf=Crazyflie(uri)
+    cf.open_link(uri)
+    time.sleep(2)
+    trajectory_id = 1
 
-    with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
-        cf = scf.cf
-        trajectory_id = 1
-
-        # activate_mellinger_controller(cf)
-        duration = upload_trajectory(cf, trajectory_id, figure8)
-        print('The sequence is {:.1f} seconds long'.format(duration))
-        reset_estimator(cf)
-        run_sequence(cf, trajectory_id, duration)
+    #activate_high_level_commander(cf)
+    # activate_mellinger_controller(cf)
+    #duration = upload_trajectory(cf, trajectory_id, figure8)
+    #print('The sequence is {:.1f} seconds long'.format(duration))
+    #reset_estimator(cf)
+    run_sequence(cf, trajectory_id, 1)

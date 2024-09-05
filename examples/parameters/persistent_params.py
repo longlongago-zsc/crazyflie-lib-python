@@ -38,7 +38,7 @@ from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.utils import uri_helper
 
 # uri = uri_helper.uri_from_env(default='usb://0')
-uri = uri_helper.uri_from_env(default='radio://0/30/2M/E7E7E7E7E7')
+uri = 'udp://192.168.43.42' # uri_helper.uri_from_env(default='radio://0/30/2M/E7E7E7E7E7')
 
 # Only output errors from the logging framework
 logging.basicConfig(level=logging.ERROR)

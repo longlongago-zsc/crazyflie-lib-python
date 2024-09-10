@@ -59,6 +59,10 @@ __all__ = ['Crazyflie']
 logging.basicConfig(level = logging.DEBUG,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Create a NullHandler
+# null_handler = logging.NullHandler()
+# logger.addHandler(null_handler)
+# logger.propagate = False
 
 class State:
     """Stat of the connection procedure"""

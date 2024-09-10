@@ -17,6 +17,7 @@ import threading
 import queue
 from socket import *
 import json
+
 send_queue = queue.Queue()
 recv_queue = queue.Queue()
 is_quit = False
@@ -24,7 +25,34 @@ is_quit = False
 __author__ = 'HighGreat'
 __all__ = ['CrazyflieLibWrapper']
 
+# 1、创建一个logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# 2、创建一个handler，用于写入日志文件
+import os.path
+import datetime
+
+if not os.path.isdir('../logs') and not os.path.exists('../logs'):
+    os.makedirs('../logs')
+fh = logging.FileHandler('../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
+                         mode='a')
+fh.setLevel(logging.DEBUG)
+
+# 再创建一个handler，用于输出到控制台
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
+# 3、定义handler的输出格式（formatter）
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
+
+# 4、给handler添加formatter
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+
+# 5、给logger添加handler
+logger.addHandler(fh)
+logger.addHandler(ch)
 
 
 class UIState:
@@ -32,6 +60,7 @@ class UIState:
     CONNECTING = 1
     CONNECTED = 2
     SCANNING = 3
+
 
 class CmdEnum():
     UNKNOWN = 0
@@ -45,22 +74,23 @@ class CmdEnum():
     MAGNETOMETER = 8
     ACC = 9
 
+
 CmdDict = {
     CmdEnum.UNKNOWN: 'Unknown',
     CmdEnum.DISCONNECT: 'disconnect',
-    CmdEnum.CONNECT:'connect',
-    CmdEnum.ESTIMATE:'estimate',
-    CmdEnum.MOTORS:'motor',
-    CmdEnum.BATTERY:'battery',
-    CmdEnum.QUIT:'quit'
+    CmdEnum.CONNECT: 'connect',
+    CmdEnum.ESTIMATE: 'estimate',
+    CmdEnum.MOTORS: 'motor',
+    CmdEnum.BATTERY: 'battery',
+    CmdEnum.QUIT: 'quit'
 }
+
 
 class BatteryStates:
     BATTERY, CHARGING, CHARGED, LOW_POWER = list(range(4))
 
 
 class CrazyflieLibWrapper:
-
     LOG_NAME_THRUST = 'stabilizer.thrust'
     LOG_NAME_MOTOR_1 = 'motor.m1'
     LOG_NAME_MOTOR_2 = 'motor.m2'
@@ -137,8 +167,8 @@ class CrazyflieLibWrapper:
             msg = {
                 'cmd': CmdEnum.ESTIMATE,
                 'data': [self.estimateX, self.estimateY, self.estimateZ,
-                        self.estimateRoll, self.estimatePitch, self.estimateYaw] ,
-                'status':0
+                         self.estimateRoll, self.estimatePitch, self.estimateYaw],
+                'status': 0
             }
             send_queue.put(msg)
 
@@ -147,8 +177,8 @@ class CrazyflieLibWrapper:
 
     def _logging_error(self, log_conf, msg):
         logger.error(self, "Log error",
-                          "Error when starting log config [%s]: %s" % (
-                              log_conf.name, msg))
+                     "Error when starting log config [%s]: %s" % (
+                         log_conf.name, msg))
 
     def _log_data_received(self, timestamp, data, logconf):
         global send_queue
@@ -189,19 +219,21 @@ class CrazyflieLibWrapper:
 
     def _acc_data_receviced(self, timestamp, data, logconf):
         global send_queue
-        msg = {'cmd': CmdEnum.ACC, 'data': [data[self.LOG_NAME_ACC_X], data[self.LOG_NAME_ACC_Y], data[self.LOG_NAME_ACC_Z]], 'status': 0}
+        msg = {'cmd': CmdEnum.ACC,
+               'data': [data[self.LOG_NAME_ACC_X], data[self.LOG_NAME_ACC_Y], data[self.LOG_NAME_ACC_Z]], 'status': 0}
         send_queue.put(msg)
 
     def _magnetometer_data_receviced(self, timestamp, data, logconf):
         global send_queue
-        msg = {'cmd': CmdEnum.MAGNETOMETER, 'data': [data[self.LOG_NAME_MAG_X], data[self.LOG_NAME_MAG_Y], data[self.LOG_NAME_MAG_Z]], 'status': 0}
+        msg = {'cmd': CmdEnum.MAGNETOMETER,
+               'data': [data[self.LOG_NAME_MAG_X], data[self.LOG_NAME_MAG_Y], data[self.LOG_NAME_MAG_Z]], 'status': 0}
         send_queue.put(msg)
 
     def _barometer_data_receviced(self, timestamp, data, logconf):
         global send_queue
-        msg = {'cmd': CmdEnum.BAROMETER, 'data': [data[self.LOG_NAME_ASL], data[self.LOG_NAME_PRESSURE], data[self.LOG_NAME_TEMP]], 'status': 0}
+        msg = {'cmd': CmdEnum.BAROMETER,
+               'data': [data[self.LOG_NAME_ASL], data[self.LOG_NAME_PRESSURE], data[self.LOG_NAME_TEMP]], 'status': 0}
         send_queue.put(msg)
-
 
     def _update_battery(self, timestamp, data, logconf):
         global send_queue
@@ -362,25 +394,27 @@ class CrazyflieLibWrapper:
             send_queue.put(msg)
             logger.error('set_param error:{0}'.format(e))
 
+
 def udpSendhandle(udp_socket, crazyflie, pc_address):
     global send_queue
     global is_quit
     msg = ''
     while not is_quit:
         try:
-            msg = send_queue.get(block = True, timeout = 30)
-        except Exception as e:
+            msg = send_queue.get(block=True, timeout=10)
+        except BaseException as e:
             if crazyflie.uiState == UIState.CONNECTED or crazyflie.uiState == UIState.CONNECTING:
                 logger.debug('disconnect:{0}'.format(e))
                 crazyflie.disconnect()
         if msg:
             # logger.debug('send msg:{0}'.format(msg))
             json_data = json.dumps(msg)
-            bytes_data  = json_data.encode('utf-8')
+            bytes_data = json_data.encode('utf-8')
             try:
-                udp_socket.sendto(bytes_data , pc_address)
-            except Exception as e:
+                udp_socket.sendto(bytes_data, pc_address)
+            except BaseException as e:
                 logger.debug('udpSendhandle Socket error: socket might be closed. because:{0}'.format(e))
+
 
 def udpReceivehandle(udp_socket, crazyflie):
     global recv_queue
@@ -388,10 +422,11 @@ def udpReceivehandle(udp_socket, crazyflie):
     global is_quit
 
     while not is_quit:
+        data = None
         try:
             data, addr = udp_socket.recvfrom(1024)
         except OSError:
-                logger.debug("udpReceivehandle Socket error: socket might be closed.")
+            logger.debug("udpReceivehandle Socket error: socket might be closed.")
 
         cmd = CmdEnum.UNKNOWN
 
@@ -416,7 +451,7 @@ def udpReceivehandle(udp_socket, crazyflie):
         except Exception:
             logger.debug("recv data to json error")
 
-        logger.debug('recv cmd: %d<--->%s' % (cmd, CmdDict.get(cmd , 'UNKNOWN')))
+        logger.debug('recv cmd: %d<--->%s' % (cmd, CmdDict.get(cmd, 'UNKNOWN')))
 
         if (cmd == CmdEnum.QUIT):
             crazyflie.disconnect()
@@ -443,7 +478,7 @@ def udpReceivehandle(udp_socket, crazyflie):
 
 if __name__ == "__main__":
 
-    logger.debug('-'*20 + "begin" + '-'*20)
+    logger.debug('-' * 20 + "begin" + '-' * 20)
 
     udp_address = ('127.0.0.1', 9494)
     pc_address = ('127.0.0.1', 9191)
@@ -469,5 +504,3 @@ if __name__ == "__main__":
     crazyflie.disconnect()
 
     logger.debug('-' * 20 + "end" + '-' * 20)
-
-

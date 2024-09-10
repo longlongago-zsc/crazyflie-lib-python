@@ -33,6 +33,7 @@ import threading
 import time
 from socket import *
 import traceback
+import os.path
 
 import queue
 keep_live_queue = queue.Queue()
@@ -47,14 +48,17 @@ __author__ = 'Bitcraze AB'
 __all__ = ['UdpDriver']
 
 import logging
+import datetime
 
 # 1、创建一个logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # 2、创建一个handler，用于写入日志文件
-# fh = logging.FileHandler(__name__ + '_Debug.log')
-# fh.setLevel(logging.DEBUG)
+if not os.path.isdir('../logs') and not os.path.exists('../logs'):
+    os.makedirs('../logs')
+fh = logging.FileHandler('../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log', mode='a')
+fh.setLevel(logging.DEBUG)
 
 # 再创建一个handler，用于输出到控制台
 ch = logging.StreamHandler()
@@ -64,11 +68,11 @@ ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
 
 # 4、给handler添加formatter
-# fh.setFormatter(formatter)
+fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 
 # 5、给logger添加handler
-# logger.addHandler(fh)
+logger.addHandler(fh)
 logger.addHandler(ch)
 
 def _send_packet(send_socket, addr):
@@ -77,7 +81,7 @@ def _send_packet(send_socket, addr):
     msg = b'\xFF\x01\x01\x01'
     while is_connected:
         try:
-            msg = keep_live_queue.get(timeout=0.02)
+            msg = keep_live_queue.get(timeout=0.050)
         except queue.Empty:
             msg = b'\xFF\x01\x01\x01'
         # logger.debug("send: {}".format(binascii.hexlify(raw)))
@@ -85,7 +89,7 @@ def _send_packet(send_socket, addr):
             send_socket.sendto(msg, addr)
         except OSError:
             logger.warning("Socket error")
-            # is_connected = False
+            is_connected = False
 
 class UdpDriver(CRTPDriver):
 
@@ -167,13 +171,13 @@ class UdpDriver(CRTPDriver):
         raw = raw + (cksum,)
         # change the tuple to bytes
         raw = bytearray(raw)
-        keep_live_queue.put_nowait(raw)
+        keep_live_queue.put(raw)
 
     def close(self):
         global is_connected
         # Remove this from the server clients list
         is_connected = False
-        time.sleep(1)
+        time.sleep(0.01)
         self.socket.close()
 
     def get_name(self):

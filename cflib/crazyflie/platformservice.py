@@ -29,11 +29,37 @@ import logging
 
 from cflib.crtp.crtpstack import CRTPPacket
 from cflib.crtp.crtpstack import CRTPPort
+import os.path
+import datetime
 
 __author__ = 'Bitcraze AB'
 __all__ = ['PlatformService']
 
+# 1、创建一个logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# 2、创建一个handler，用于写入日志文件
+if not os.path.isdir('../logs') and not os.path.exists('../logs'):
+    os.makedirs('../logs')
+fh = logging.FileHandler('../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
+                         mode='a')
+fh.setLevel(logging.INFO)
+
+# 再创建一个handler，用于输出到控制台
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+
+# 3、定义handler的输出格式（formatter）
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
+
+# 4、给handler添加formatter
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+
+# 5、给logger添加handler
+logger.addHandler(fh)
+logger.addHandler(ch)
 
 PLATFORM_COMMAND = 0
 VERSION_COMMAND = 1

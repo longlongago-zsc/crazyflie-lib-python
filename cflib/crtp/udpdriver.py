@@ -36,6 +36,7 @@ import traceback
 import os.path
 
 import queue
+
 keep_live_queue = queue.Queue()
 is_connected = False
 
@@ -57,7 +58,8 @@ logger.setLevel(logging.DEBUG)
 # 2、创建一个handler，用于写入日志文件
 if not os.path.isdir('../logs') and not os.path.exists('../logs'):
     os.makedirs('../logs')
-fh = logging.FileHandler('../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log', mode='a')
+fh = logging.FileHandler('../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
+                         mode='a')
 fh.setLevel(logging.DEBUG)
 
 # 再创建一个handler，用于输出到控制台
@@ -75,13 +77,14 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
+
 def _send_packet(send_socket, addr):
     global keep_live_queue
     global is_connected
     msg = b'\xFF\x01\x01\x01'
     while is_connected:
         try:
-            msg = keep_live_queue.get(timeout=0.050)
+            msg = keep_live_queue.get(timeout=0.080)
         except queue.Empty:
             msg = b'\xFF\x01\x01\x01'
         # logger.debug("send: {}".format(binascii.hexlify(raw)))
@@ -90,6 +93,7 @@ def _send_packet(send_socket, addr):
         except OSError:
             logger.warning("Socket error")
             is_connected = False
+
 
 class UdpDriver(CRTPDriver):
 
@@ -141,9 +145,9 @@ class UdpDriver(CRTPDriver):
                 cksum += i
             cksum %= 256
             # if self.debug:
-                # raw = bytearray(data)
-                # logger.debug("recv: {}".format(binascii.hexlify(bytearray(raw))))
-                # pass
+            # raw = bytearray(data)
+            # logger.debug("recv: {}".format(binascii.hexlify(bytearray(raw))))
+            # pass
             if cksum != cksum_recv:
                 if self.debug:
                     logger.debug("Checksum error {} != {}".format(cksum, cksum_recv))
@@ -153,7 +157,7 @@ class UdpDriver(CRTPDriver):
 
             # print the raw date
             #if self.debug:
-                # logger.debug("recv: {}".format(binascii.hexlify(bytearray(data))))
+            # logger.debug("recv: {}".format(binascii.hexlify(bytearray(data))))
             #    pass
             return pk
         else:

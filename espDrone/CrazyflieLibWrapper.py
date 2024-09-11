@@ -433,7 +433,7 @@ def udpReceivehandle(udp_socket, crazyflie):
         try:
             if data:
                 strs = ''
-                logger.debug(type(data))
+                # logger.debug(type(data))
                 if isinstance(data, bytes):
                     strs = data.decode('utf-8')
                 elif isinstance(data, bytearray):
@@ -451,7 +451,7 @@ def udpReceivehandle(udp_socket, crazyflie):
         except Exception:
             logger.debug("recv data to json error")
 
-        logger.debug('recv cmd: %d<--->%s' % (cmd, CmdDict.get(cmd, 'UNKNOWN')))
+        # logger.debug('recv cmd: %d<--->%s' % (cmd, CmdDict.get(cmd, 'UNKNOWN')))
 
         if (cmd == CmdEnum.QUIT):
             crazyflie.disconnect()
@@ -480,8 +480,8 @@ if __name__ == "__main__":
 
     logger.debug('-' * 20 + "begin" + '-' * 20)
 
-    udp_address = ('127.0.0.1', 9494)
-    pc_address = ('127.0.0.1', 9191)
+    udp_address = ('127.0.0.1', 59494)
+    pc_address = ('127.0.0.1', 59191)
     udp_socket = socket(AF_INET, SOCK_DGRAM)
     udp_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     udp_socket.bind(udp_address)

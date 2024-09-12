@@ -17,6 +17,8 @@ import threading
 import queue
 from socket import *
 import json
+import os.path
+import datetime
 
 send_queue = queue.Queue()
 recv_queue = queue.Queue()
@@ -30,9 +32,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # 2、创建一个handler，用于写入日志文件
-import os.path
-import datetime
-
 if not os.path.isdir('../logs') and not os.path.exists('../logs'):
     os.makedirs('../logs')
 fh = logging.FileHandler('../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',

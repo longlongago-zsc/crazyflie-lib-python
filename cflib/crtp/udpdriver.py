@@ -98,6 +98,9 @@ def _send_packet(send_socket, addr):
 class UdpDriver(CRTPDriver):
 
     def __init__(self):
+        super().__init__()
+        self.addr = None
+        self.socket = None
         self.debug = True
         self.link_error_callback = Caller()
         self.link_quality_callback = Caller()
@@ -113,7 +116,7 @@ class UdpDriver(CRTPDriver):
         self.link_quality_callback = linkQualityCallback
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        self.addr = (uri.split('udp://')[1], 2390)  #  The destination IP and port '192.168.43.42'
+        self.addr = (uri.split('udp://')[1], 2390)  # The destination IP and port '192.168.43.42'
         self.socket.bind(('', 2399))
         self.socket.connect(self.addr)
         is_connected = True
@@ -127,9 +130,11 @@ class UdpDriver(CRTPDriver):
             data, addr = self.socket.recvfrom(1024)
         except BaseException as e:
             is_connected = False
-            if self.link_error_callback:
+            try:
                 self.link_error_callback(
                     'Error communicating with the Crazyflie. Socket error: socket might be closed.')
+            except BaseException:
+                pass
             if self.debug:
                 logger.debug("Socket error: socket might be closed.")
             return None

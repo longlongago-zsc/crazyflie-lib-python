@@ -182,7 +182,7 @@ class CrazyflieLibWrapper:
                          self.estimateRoll, self.estimatePitch, self.estimateYaw],
                 'status': 0
             }
-            send_queue.put(msg)
+            send_queue.put_nowait(msg)
 
             #  self.ai.setBaro(estimated_z, self.is_visible())
             #  self.ai.setRollPitch(-roll, pitch, self.is_visible())
@@ -200,7 +200,7 @@ class CrazyflieLibWrapper:
                       data[self.LOG_NAME_MOTOR_3], data[self.LOG_NAME_MOTOR_4],
                       data[self.LOG_NAME_THRUST], data[self.LOG_NAME_CAN_FLY]]
             msg = {'cmd': CmdEnum.MOTORS, 'data': motors, 'status': 0}
-            send_queue.put(msg)
+            send_queue.put_nowait(msg)
 
             '''self.estimateThrust.setText(
                 "%.2f%%" % self.thrustToPercentage(data[self.LOG_NAME_THRUST]))'''
@@ -213,24 +213,24 @@ class CrazyflieLibWrapper:
         global send_queue
         msg = {'cmd': CmdEnum.ACC,
                'data': [data[self.LOG_NAME_ACC_X], data[self.LOG_NAME_ACC_Y], data[self.LOG_NAME_ACC_Z]], 'status': 0}
-        send_queue.put(msg)
+        send_queue.put_nowait(msg)
 
     def _magnetometer_data_receviced(self, timestamp, data, logconf):
         global send_queue
         msg = {'cmd': CmdEnum.MAGNETOMETER,
                'data': [data[self.LOG_NAME_MAG_X], data[self.LOG_NAME_MAG_Y], data[self.LOG_NAME_MAG_Z]], 'status': 0}
-        send_queue.put(msg)
+        send_queue.put_nowait(msg)
 
     def _barometer_data_receviced(self, timestamp, data, logconf):
         global send_queue
         msg = {'cmd': CmdEnum.BAROMETER,
                'data': [data[self.LOG_NAME_ASL], data[self.LOG_NAME_PRESSURE], data[self.LOG_NAME_TEMP]], 'status': 0}
-        send_queue.put(msg)
+        send_queue.put_nowait(msg)
 
     def _update_battery(self, timestamp, data, logconf):
         global send_queue
         msg = {'cmd': CmdEnum.BATTERY, 'data': [data["pm.vbat"], data["pm.state"]], 'status': 0}
-        send_queue.put(msg)
+        send_queue.put_nowait(msg)
 
         # logger.debug('_update_battery:%d', (int(data["pm.vbat"] * 1000)))
         # self.batteryBar.setValue(int(data["pm.vbat"] * 1000))
@@ -252,7 +252,7 @@ class CrazyflieLibWrapper:
         self.uiState = UIState.DISCONNECTED
         global send_queue
         msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': self.connectState}
-        send_queue.put(msg)
+        send_queue.put_nowait(msg)
 
     def _connection_initiated(self, url):
         self.uiState = UIState.CONNECTING
@@ -272,7 +272,7 @@ class CrazyflieLibWrapper:
         self.connectState = ConnectionState.CONNECT_SUCCESS
 
         msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.CONNECTED], 'status': self.connectState}
-        send_queue.put(msg)
+        send_queue.put_nowait(msg)
         logger.debug(f'Parameters downloaded to {link_uri}')
 
         lg = LogConfig("Battery", 1000)
@@ -355,7 +355,7 @@ class CrazyflieLibWrapper:
         self.connectState = ConnectionState.CONNECT_ERROR
         global send_queue
         msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.DISCONNECTED], 'status': self.connectState}
-        send_queue.put(msg)
+        send_queue.put_nowait(msg)
         logger.debug(f"_connection_lost{errMsg}")
 
     def _connection_failed(self, linkURI, errMsg):
@@ -363,14 +363,14 @@ class CrazyflieLibWrapper:
         self.connectState = ConnectionState.CONNECT_ERROR
         global send_queue
         msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.DISCONNECTED], 'status': self.connectState}
-        send_queue.put(msg)
+        send_queue.put_nowait(msg)
         logger.debug(f"_connection_failed:{error}")
 
     def connect(self):
         global send_queue
         if self.uiState == UIState.CONNECTED or self.uiState == UIState.CONNECTING:
             msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': self.connectState}
-            send_queue.put(msg)
+            send_queue.put_nowait(msg)
         else:
             self._connect()
             logger.debug(("connect url:%s" % self.link_url))
@@ -386,7 +386,7 @@ class CrazyflieLibWrapper:
             self.cf.param.set_value(name, value)
         except Exception as e:
             msg = {'cmd': CmdEnum.UNKNOWN, 'data': value, 'status': 1}
-            send_queue.put(msg)
+            send_queue.put_nowait(msg)
             logger.error('set_param error:{0}'.format(e))
 
 
@@ -396,7 +396,7 @@ def udpSendhandle(udp_socket, crazyflie, pc_address):
     msg = None
     while not is_quit:
         try:
-            msg = send_queue.get(block=True, timeout=10)
+            msg = send_queue.get(block=True, timeout=20)
         except BaseException as e:
             msg = None
             if crazyflie.uiState == UIState.CONNECTED or crazyflie.uiState == UIState.CONNECTING:
@@ -457,10 +457,10 @@ def udpReceivehandle(udp_socket, crazyflie):
             crazyflie.connectState = ConnectionState.MANU_DISCONNECT
             crazyflie.disconnect()
             msg = {'cmd': CmdEnum.QUIT, 'data': [0], 'status': 0}
-            send_queue.put(msg)
+            send_queue.put_nowait(msg)
             time.sleep(0.01)
             is_quit = True
-            send_queue.put(msg)
+            send_queue.put_nowait(msg)
         elif cmd == CmdEnum.DISCONNECT:
             crazyflie.connectState = ConnectionState.MANU_DISCONNECT
             crazyflie.disconnect()
@@ -470,10 +470,10 @@ def udpReceivehandle(udp_socket, crazyflie):
             except Exception:
                 crazyflie.connectState = ConnectionState.CONNECT_ERROR
                 msg = {'cmd': CmdEnum.CONNECT, 'data': [UIState.DISCONNECTED], 'status': crazyflie.connectState}
-                send_queue.put(msg)
+                send_queue.put_nowait(msg)
         else:
             msg = {'cmd': CmdEnum.UNKNOWN, 'data': [0], 'status': 1}
-            send_queue.put(msg)
+            send_queue.put_nowait(msg)
 
     Config().save_file()
     crazyflie.disconnect()

@@ -80,6 +80,7 @@ VERSION_GET_FIRMWARE = 1
 
 LINKSERVICE_SOURCE = 1
 
+PROTOCOL_VERSION = 4
 
 class PlatformService():
     """
@@ -146,6 +147,9 @@ class PlatformService():
         """
         Return version of the CRTP protocol
         """
+        if self._protocolVersion < 0:
+            return PROTOCOL_VERSION  # -1
+
         return self._protocolVersion
 
     def _request_protocol_version(self):

@@ -88,7 +88,7 @@ def _send_packet(send_socket, addr):
     global is_connected
     while is_connected:
         try:
-            msg = keep_live_queue.get(timeout=0.09)
+            msg = keep_live_queue.get(timeout=0.1)
         except queue.Empty:
             msg = b'\xFF\x01\x01\x01'
         # logger.debug("send: {}".format(binascii.hexlify(raw)))
@@ -123,6 +123,7 @@ class UdpDriver(CRTPDriver):
         self.addr = (uri.split('udp://')[1], 2390)  # The destination IP and port '192.168.43.42'
         self.socket.bind(('', 2399))
         self.socket.connect(self.addr)
+        self.socket.sendto('\xFF\x01\x01\x01'.encode(), self.addr)
         is_connected = True
         self._thread = threading.Thread(target=_send_packet, args=(self.socket, self.addr))
         self._thread.start()
@@ -185,16 +186,14 @@ class UdpDriver(CRTPDriver):
         raw = raw + (cksum,)
         # change the tuple to bytes
         raw = bytearray(raw)
-        keep_live_queue.put(raw)
+        # self.socket.sendto(raw, self.addr)
+        keep_live_queue.put_nowait(raw)
 
     def close(self):
         global is_connected
-        global keep_live_queue
-        # Remove this from the server clients list
-        msg = b'\xFF\x01\x02\x02'
-        keep_live_queue.put(msg)
-        time.sleep(0.005)
         is_connected = False
+        # Remove this from the server clients list
+        time.sleep(1)
         self.socket.close()
 
     def get_name(self):

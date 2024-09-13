@@ -1,24 +1,23 @@
 import logging
 import time
-from enum import Enum
-
-import cflib.crtp
-import espDrone
-from cflib.crazyflie import Crazyflie
-from cflib.crazyflie.log import LogConfig
-from cflib.utils.callbacks import Caller
-#  from cflib.crazyflie.mem import MemoryElement
-from espDrone.pose_logger import PoseLogger
-from espDrone.pluginhelper import PluginHelper
-from espDrone.config import Config
-from espDrone.logconfigreader import LogConfigReader
-
 import threading
 import queue
 from socket import *
 import json
 import os.path
 import datetime
+
+import cflib.crtp
+import espDrone
+from cflib.crazyflie import Crazyflie
+from cflib.crazyflie.log import LogConfig
+#  from cflib.utils.callbacks import Caller
+#  from cflib.crazyflie.mem import MemoryElement
+from espDrone.pose_logger import PoseLogger
+from espDrone.pluginhelper import PluginHelper
+from espDrone.config import Config
+#  from espDrone.logconfigreader import LogConfigReader
+
 
 send_queue = queue.Queue()
 recv_queue = queue.Queue()
@@ -32,25 +31,30 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # 2、创建一个handler，用于写入日志文件
-if not os.path.isdir('../logs') and not os.path.exists('../logs'):
-    os.makedirs('../logs')
-fh = logging.FileHandler('../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
-                         mode='a')
-fh.setLevel(logging.DEBUG)
+try:
+    if not os.path.isdir('../logs') and not os.path.exists('../logs'):
+        os.makedirs('../logs')
+    fh = logging.FileHandler(
+        '../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
+        mode='a')
+    fh.setLevel(logging.DEBUG)
+    # 3、定义handler的输出格式（formatter）
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
+
+    # 4、给handler添加formatter
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+except:
+    pass
 
 # 再创建一个handler，用于输出到控制台
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
-
 # 3、定义handler的输出格式（formatter）
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
-
 # 4、给handler添加formatter
-fh.setFormatter(formatter)
 ch.setFormatter(formatter)
-
 # 5、给logger添加handler
-logger.addHandler(fh)
 logger.addHandler(ch)
 
 
@@ -135,13 +139,12 @@ class CrazyflieLibWrapper:
 
         # Connect some callbacks from the Crazyflie API
         self.cf.connected.add_callback(self._connected)
-        self.cf.fully_connected.add_callback(self._fully_connected)
         self.cf.disconnected.add_callback(self._disconnected)
         self.cf.connection_lost.add_callback(self._connection_lost)
         self.cf.connection_requested.add_callback(self._connection_initiated)
 
         # Parse the log configuration files
-        self.logConfigReader = LogConfigReader(self.cf)
+        # self.logConfigReader = LogConfigReader(self.cf)
 
         self.estimateX = 0.0
         self.estimateY = 0.0
@@ -150,9 +153,10 @@ class CrazyflieLibWrapper:
         self.estimatePitch = 0.0
         self.estimateYaw = 0.0
         # Add things to helper so tabs can access it
-        PluginHelper.cf = self.cf
-        PluginHelper.pose_logger = PoseLogger(self.cf)
-        PluginHelper.pose_logger.data_received_cb.add_callback(self._pose_data_received)
+        self._pose_logger = PluginHelper()
+        self._pose_logger.cf = self.cf
+        self._pose_logger.pose_logger = PoseLogger(self.cf)
+        self._pose_logger.pose_logger.data_received_cb.add_callback(self._pose_data_received)
 
     def _pose_data_received(self, pose_logger, pose):
         global send_queue
@@ -204,23 +208,6 @@ class CrazyflieLibWrapper:
             '''if data[self.LOG_NAME_CAN_FLY] != self._can_fly_deprecated:
                 self._can_fly_deprecated = data[self.LOG_NAME_CAN_FLY]
                 self._update_flight_commander(True)'''
-
-    def _connected(self, url):
-        self.uiState = UIState.CONNECTED
-        self.connectState = ConnectionState.CONNECT_SUCCESS
-
-        Config().set("link_uri", str(self.link_url))
-
-        lg = LogConfig("Battery", 1000)
-        lg.add_variable("pm.vbat", "float")
-        lg.add_variable("pm.state", "int8_t")
-        try:
-            self.cf.log.add_config(lg)
-            lg.data_received_cb.add_callback(self._update_battery)
-            lg.error_cb.add_callback(self._logging_error)
-            lg.start()
-        except KeyError as e:
-            logger.warning(str(e))
 
     def _acc_data_receviced(self, timestamp, data, logconf):
         global send_queue
@@ -277,7 +264,7 @@ class CrazyflieLibWrapper:
             self.connectState = ConnectionState.NO_CONNECT
             self.cf.open_link(self.link_url)
 
-    def _fully_connected(self, link_uri):
+    def _connected(self, link_uri):
         global send_queue
         """This callback is called when the Crazyflie has been connected and all parameters have been
                 downloaded. It is now OK to set and get parameters."""
@@ -288,8 +275,48 @@ class CrazyflieLibWrapper:
         send_queue.put(msg)
         logger.debug(f'Parameters downloaded to {link_uri}')
 
+        lg = LogConfig("Battery", 1000)
+        lg.add_variable("pm.vbat", "float")
+        lg.add_variable("pm.state", "int8_t")
+        try:
+            self.cf.log.add_config(lg)
+            lg.data_received_cb.add_callback(self._update_battery)
+            lg.error_cb.add_callback(self._logging_error)
+            lg.start()
+        except KeyError as e:
+            logger.warning(str(e))
+        time.sleep(0.1)
+
+        # barometer
+        lg = LogConfig("Barometer", 100)
+        lg.add_variable(self.LOG_NAME_ASL, "float")
+        lg.add_variable(self.LOG_NAME_PRESSURE, "float")
+        lg.add_variable(self.LOG_NAME_TEMP, "float")
+        try:
+            self.cf.log.add_config(lg)
+            lg.data_received_cb.add_callback(self._barometer_data_receviced)
+            lg.error_cb.add_callback(self._logging_error)
+            lg.start()
+        except Exception as e:
+            logger.warning(str(e))
+        time.sleep(0.1)
+
+        # barometer
+        lg = LogConfig("Magnetometer", 120)
+        lg.add_variable(self.LOG_NAME_MAG_X, "float")
+        lg.add_variable(self.LOG_NAME_MAG_Y, "float")
+        lg.add_variable(self.LOG_NAME_MAG_Z, "float")
+        try:
+            self.cf.log.add_config(lg)
+            lg.data_received_cb.add_callback(self._magnetometer_data_receviced)
+            lg.error_cb.add_callback(self._logging_error)
+            lg.start()
+        except Exception as e:
+            logger.warning(str(e))
+        time.sleep(0.1)
+
         # MOTOR & THRUST
-        lg = LogConfig("Motors", 90)
+        lg = LogConfig("Motors", 200)
         lg.add_variable(self.LOG_NAME_THRUST, "uint16_t")
         lg.add_variable(self.LOG_NAME_MOTOR_1)
         lg.add_variable(self.LOG_NAME_MOTOR_2)
@@ -308,35 +335,10 @@ class CrazyflieLibWrapper:
             logger.warning(str(e))
         except Exception as e:
             logger.warning(str(e))
-
-        # barometer
-        lg = LogConfig("Barometer", 100)
-        lg.add_variable(self.LOG_NAME_ASL, "float")
-        lg.add_variable(self.LOG_NAME_PRESSURE, "float")
-        lg.add_variable(self.LOG_NAME_TEMP, "float")
-        try:
-            self.cf.log.add_config(lg)
-            lg.data_received_cb.add_callback(self._barometer_data_receviced)
-            lg.error_cb.add_callback(self._logging_error)
-            lg.start()
-        except Exception as e:
-            logger.warning(str(e))
-
-        # barometer
-        lg = LogConfig("Magnetometer", 110)
-        lg.add_variable(self.LOG_NAME_MAG_X, "float")
-        lg.add_variable(self.LOG_NAME_MAG_Y, "float")
-        lg.add_variable(self.LOG_NAME_MAG_Z, "float")
-        try:
-            self.cf.log.add_config(lg)
-            lg.data_received_cb.add_callback(self._magnetometer_data_receviced)
-            lg.error_cb.add_callback(self._logging_error)
-            lg.start()
-        except Exception as e:
-            logger.warning(str(e))
+        time.sleep(0.1)
 
         # acc sensor
-        lg = LogConfig("AccSensor", 120)
+        lg = LogConfig("AccSensor", 150)
         lg.add_variable(self.LOG_NAME_ACC_X, "float")
         lg.add_variable(self.LOG_NAME_ACC_Y, "float")
         lg.add_variable(self.LOG_NAME_ACC_Z, "float")

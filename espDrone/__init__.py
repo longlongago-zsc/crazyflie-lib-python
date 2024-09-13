@@ -33,13 +33,13 @@ import sys
 if not hasattr(sys, 'frozen'):
     module_path = os.path.dirname(__file__)
 else:
-    module_path = os.path.join(os.path.dirname(sys.executable), "espDrone")
-config_path = AppDirs("espDrone", "HighGreat").user_config_dir
+    module_path = os.path.join(os.path.dirname(sys.executable), "CrazyflieDrone")
+config_path = AppDirs("CrazyflieDrone", "HighGreat").user_config_dir
 
 if not hasattr(sys, 'frozen'):
     import pkg_resources
     try:
-        VERSION = pkg_resources.require("espDrone")[0].version
+        VERSION = pkg_resources.require("CrazyflieDrone")[0].version
     except pkg_resources.DistributionNotFound:
         VERSION = "dev"
 else:

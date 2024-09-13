@@ -56,49 +56,53 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # 2、创建一个handler，用于写入日志文件
-if not os.path.isdir('../logs') and not os.path.exists('../logs'):
-    os.makedirs('../logs')
-fh = logging.FileHandler('../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
-                         mode='a')
-fh.setLevel(logging.DEBUG)
+try:
+    if not os.path.isdir('../logs') and not os.path.exists('../logs'):
+        os.makedirs('../logs')
+    fh = logging.FileHandler(
+        '../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
+        mode='a')
+    fh.setLevel(logging.DEBUG)
+    # 3、定义handler的输出格式（formatter）
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
+
+    # 4、给handler添加formatter
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+except:
+    pass
 
 # 再创建一个handler，用于输出到控制台
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
-
 # 3、定义handler的输出格式（formatter）
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
-
 # 4、给handler添加formatter
-fh.setFormatter(formatter)
 ch.setFormatter(formatter)
-
 # 5、给logger添加handler
-logger.addHandler(fh)
 logger.addHandler(ch)
 
 
 def _send_packet(send_socket, addr):
     global keep_live_queue
     global is_connected
-    msg = b'\xFF\x01\x01\x01'
     while is_connected:
         try:
-            msg = keep_live_queue.get(timeout=0.080)
+            msg = keep_live_queue.get(timeout=0.09)
         except queue.Empty:
             msg = b'\xFF\x01\x01\x01'
         # logger.debug("send: {}".format(binascii.hexlify(raw)))
         try:
             send_socket.sendto(msg, addr)
         except OSError:
-            logger.warning("Socket error")
-            is_connected = False
+            logger.warning("_send_packet: Socket error")
 
 
 class UdpDriver(CRTPDriver):
 
     def __init__(self):
         super().__init__()
+        self._thread = None
         self.addr = None
         self.socket = None
         self.debug = True
@@ -120,7 +124,8 @@ class UdpDriver(CRTPDriver):
         self.socket.bind(('', 2399))
         self.socket.connect(self.addr)
         is_connected = True
-        threading.Thread(target=_send_packet, args=(self.socket, self.addr)).start()
+        self._thread = threading.Thread(target=_send_packet, args=(self.socket, self.addr))
+        self._thread.start()
         if self.debug:
             logger.debug("Connected to UDP server")
 
@@ -184,9 +189,12 @@ class UdpDriver(CRTPDriver):
 
     def close(self):
         global is_connected
+        global keep_live_queue
         # Remove this from the server clients list
+        msg = b'\xFF\x01\x02\x02'
+        keep_live_queue.put(msg)
+        time.sleep(0.005)
         is_connected = False
-        time.sleep(0.01)
         self.socket.close()
 
     def get_name(self):

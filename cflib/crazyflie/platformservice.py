@@ -37,29 +37,35 @@ __all__ = ['PlatformService']
 
 # 1、创建一个logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # 2、创建一个handler，用于写入日志文件
-if not os.path.isdir('../logs') and not os.path.exists('../logs'):
-    os.makedirs('../logs')
-fh = logging.FileHandler('../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
-                         mode='a')
-fh.setLevel(logging.INFO)
+try:
+    if not os.path.isdir('../logs') and not os.path.exists('../logs'):
+        os.makedirs('../logs')
+    fh = logging.FileHandler(
+        '../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
+        mode='a')
+    fh.setLevel(logging.DEBUG)
+    # 3、定义handler的输出格式（formatter）
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
+
+    # 4、给handler添加formatter
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+except:
+    pass
 
 # 再创建一个handler，用于输出到控制台
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-
+ch.setLevel(logging.DEBUG)
 # 3、定义handler的输出格式（formatter）
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
-
 # 4、给handler添加formatter
-fh.setFormatter(formatter)
 ch.setFormatter(formatter)
-
 # 5、给logger添加handler
-logger.addHandler(fh)
 logger.addHandler(ch)
+
 
 PLATFORM_COMMAND = 0
 VERSION_COMMAND = 1
@@ -133,7 +139,7 @@ class PlatformService():
         """
         pk = CRTPPacket()
         pk.set_header(CRTPPort.PLATFORM, PLATFORM_COMMAND)
-        pk.data = (PLATFORM_REQUEST_CRASH_RECOVERY, )
+        pk.data = (PLATFORM_REQUEST_CRASH_RECOVERY,)
         self._cf.send_packet(pk)
 
     def get_protocol_version(self):
@@ -159,7 +165,7 @@ class PlatformService():
             if pk.data[:18].decode('utf8') == 'Bitcraze Crazyflie':
                 pk = CRTPPacket()
                 pk.set_header(CRTPPort.PLATFORM, VERSION_COMMAND)
-                pk.data = (VERSION_GET_PROTOCOL, )
+                pk.data = (VERSION_GET_PROTOCOL,)
                 logger.info('Request protocol version')
                 self._cf.send_packet(pk)
             else:

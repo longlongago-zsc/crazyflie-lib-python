@@ -107,6 +107,9 @@ class Crazyflie():
         @param rw_cache Path to read-write cache (string)
         """
 
+        # device type
+        self._device_type = None
+
         # Called on disconnect, no matter the reason
         self.disconnected = Caller()
         # Called on unintentional disconnect only
@@ -288,12 +291,19 @@ class Crazyflie():
                 self.link = None
             self.connection_failed.call(link_uri, exception_text)
 
+    def set_type(self, device_type):
+        """set device type:espdrone only for getting sensor, other control quadcopter"""
+        self._device_type = device_type
+
+    def get_type(self):
+        return self._device_type
+
     def close_link(self):
         """Close the communication link."""
         logger.info('Closing link')
-        if (self.link is not None):
+        if self.link is not None and self._device_type is None:
             self.commander.send_setpoint(0, 0, 0, 0)
-        if (self.link is not None):
+        if self.link is not None:
             self.link.close()
             self.link = None
         self._answer_patterns = {}

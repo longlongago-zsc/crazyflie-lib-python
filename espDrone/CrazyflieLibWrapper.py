@@ -119,12 +119,15 @@ class CrazyflieLibWrapper:
     LOG_NAME_MAG_Y = 'mag.y'
     LOG_NAME_MAG_Z = 'mag.z'
 
-    #acc
+    # acc
     LOG_NAME_ACC_X = 'acc.x'
     LOG_NAME_ACC_Y = 'acc.y'
     LOG_NAME_ACC_Z = 'acc.z'
 
     LINK_URL = "udp://192.168.43.42"
+
+    # device type
+    ESP_DRONE = 1
 
     def __init__(self):
         self.link_url = "udp://192.168.43.42"
@@ -134,6 +137,7 @@ class CrazyflieLibWrapper:
         logger.debug("config path: %s", espDrone.config_path)
         self.cf = Crazyflie(ro_cache=None,
                             rw_cache=espDrone.config_path + "/cache")
+        self.cf.set_type(CrazyflieLibWrapper.ESP_DRONE)
 
         cflib.crtp.init_drivers()
 
@@ -456,11 +460,11 @@ def udpReceivehandle(udp_socket, crazyflie):
         if cmd == CmdEnum.QUIT:
             crazyflie.connectState = ConnectionState.MANU_DISCONNECT
             crazyflie.disconnect()
+            time.sleep(0.1)
             msg = {'cmd': CmdEnum.QUIT, 'data': [0], 'status': 0}
             send_queue.put_nowait(msg)
-            time.sleep(0.01)
+            time.sleep(0.1)
             is_quit = True
-            send_queue.put_nowait(msg)
         elif cmd == CmdEnum.DISCONNECT:
             crazyflie.connectState = ConnectionState.MANU_DISCONNECT
             crazyflie.disconnect()
@@ -474,9 +478,6 @@ def udpReceivehandle(udp_socket, crazyflie):
         else:
             msg = {'cmd': CmdEnum.UNKNOWN, 'data': [0], 'status': 1}
             send_queue.put_nowait(msg)
-
-    Config().save_file()
-    crazyflie.disconnect()
 
 
 if __name__ == "__main__":
@@ -504,6 +505,5 @@ if __name__ == "__main__":
         t.join()
 
     udp_socket.close()
-    crazyflie.disconnect()
 
     logger.debug('-' * 20 + "end" + '-' * 20)

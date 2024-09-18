@@ -16,6 +16,7 @@ from cflib.crazyflie.log import LogConfig
 from espDrone.pose_logger import PoseLogger
 from espDrone.pluginhelper import PluginHelper
 from espDrone.config import Config
+
 #  from espDrone.logconfigreader import LogConfigReader
 
 
@@ -256,7 +257,7 @@ class CrazyflieLibWrapper:
         self.uiState = UIState.DISCONNECTED
         global send_queue
         if self.connectState != ConnectionState.SOCKET_BLOCK:
-            msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': self.connectState}
+            msg = {'cmd': CmdEnum.DISCONNECT, 'data': [self.uiState], 'status': self.connectState}
             send_queue.put_nowait(msg)
 
     def _connection_initiated(self, url):
@@ -305,7 +306,6 @@ class CrazyflieLibWrapper:
         except Exception as e:
             logger.warning(str(e))
         time.sleep(0.1)
-
 
         # barometer
         '''
@@ -380,12 +380,13 @@ class CrazyflieLibWrapper:
             send_queue.put_nowait(msg)
         else:
             self._connect()
-            logger.debug(("connect url:%s" % self.link_url))
+            #  logger.debug(("connect url:%s" % self.link_url))
 
     def disconnect(self):
         self.uiState = UIState.DISCONNECTED
         self.cf.close_link()
-        logger.debug(("disconnect url:%s" % self.link_url))
+        #  logger.debug(("disconnect url:%s" % self.link_url))
+
 
 def udpSendhandle(udp_socket, crazyflie, pc_address):
     global send_queue
@@ -412,14 +413,16 @@ def udpSendhandle(udp_socket, crazyflie, pc_address):
 
         if msg:
             recount = 0
-            # if msg['cmd'] == CmdEnum.DISCONNECT or msg['cmd'] == CmdEnum.CONNECT:
-            #    logger.debug('send msg:{0}'.format(msg))
+            cmd: int = msg['cmd']
+            if cmd == CmdEnum.DISCONNECT or cmd == CmdEnum.CONNECT:
+                logger.debug('send msg:{0}'.format(msg))
             json_data = json.dumps(msg)
             bytes_data = json_data.encode('utf-8')
             try:
                 udp_socket.sendto(bytes_data, pc_address)
             except BaseException as e:
                 logger.debug('udpSendhandle Socket error: socket might be closed. because:{0}'.format(e))
+                break
 
 
 def udpReceivehandle(udp_socket, crazyflie):
@@ -432,7 +435,7 @@ def udpReceivehandle(udp_socket, crazyflie):
             data, addr = udp_socket.recvfrom(1024)
         except OSError:
             logger.debug("udpReceivehandle Socket error: socket might be closed.")
-            continue
+            break
 
         cmd = CmdEnum.UNKNOWN
 
@@ -452,7 +455,7 @@ def udpReceivehandle(udp_socket, crazyflie):
                     pass
 
                 jsonObj = json.loads(strs)
-                logger.debug('recv data:%s' % jsonObj)
+                logger.debug('recv msg:%s' % jsonObj)
                 cmd = jsonObj.get('cmd', CmdEnum.UNKNOWN)
         except Exception:
             logger.debug("recv data to json error")
@@ -465,6 +468,7 @@ def udpReceivehandle(udp_socket, crazyflie):
             crazyflie.disconnect()
             time.sleep(0.1)
             is_quit = True
+            logger.debug("The exe will be exit.")
             break
         elif cmd == CmdEnum.DISCONNECT:
             crazyflie.connectState = ConnectionState.MANU_DISCONNECT

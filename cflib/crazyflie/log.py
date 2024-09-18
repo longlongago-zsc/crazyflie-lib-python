@@ -93,7 +93,7 @@ GET_TOC_ELEMENT = 'GET_TOC_ELEMENT'
 
 # 1、创建一个logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 # 2、创建一个handler，用于写入日志文件
 try:
@@ -102,7 +102,7 @@ try:
     fh = logging.FileHandler(
         '../logs/mechConsole_espDrone_' + datetime.datetime.now().strftime('%Y%m%d') + '_00000.log',
         mode='a')
-    fh.setLevel(logging.DEBUG)
+    fh.setLevel(logging.WARNING)
     # 3、定义handler的输出格式（formatter）
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
 

@@ -202,7 +202,7 @@ class CrazyflieLibWrapper:
         if self.uiState == UIState.CONNECTED:
             motors = [data[self.LOG_NAME_MOTOR_1], data[self.LOG_NAME_MOTOR_2],
                       data[self.LOG_NAME_MOTOR_3], data[self.LOG_NAME_MOTOR_4],
-                      data[self.LOG_NAME_THRUST], data[self.LOG_NAME_CAN_FLY]]
+                      data[self.LOG_NAME_THRUST]]
             msg = {'cmd': CmdEnum.MOTORS, 'data': motors, 'status': 0}
             send_queue.put_nowait(msg)
 
@@ -255,8 +255,9 @@ class CrazyflieLibWrapper:
     def _disconnected(self, link_uri):
         self.uiState = UIState.DISCONNECTED
         global send_queue
-        msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': self.connectState}
-        send_queue.put_nowait(msg)
+        if self.connectState != ConnectionState.SOCKET_BLOCK:
+            msg = {'cmd': CmdEnum.CONNECT, 'data': [self.uiState], 'status': self.connectState}
+            send_queue.put_nowait(msg)
 
     def _connection_initiated(self, url):
         self.uiState = UIState.CONNECTING
@@ -305,8 +306,10 @@ class CrazyflieLibWrapper:
             logger.warning(str(e))
         time.sleep(0.1)
 
+
         # barometer
-        lg = LogConfig("Magnetometer", 120)
+        '''
+        lg = LogConfig("Magnetometer", 110)
         lg.add_variable(self.LOG_NAME_MAG_X, "float")
         lg.add_variable(self.LOG_NAME_MAG_Y, "float")
         lg.add_variable(self.LOG_NAME_MAG_Z, "float")
@@ -318,15 +321,15 @@ class CrazyflieLibWrapper:
         except Exception as e:
             logger.warning(str(e))
         time.sleep(0.1)
+        '''
 
         # MOTOR & THRUST
-        lg = LogConfig("Motors", 200)
+        lg = LogConfig("Motors", 120)
         lg.add_variable(self.LOG_NAME_THRUST, "uint16_t")
         lg.add_variable(self.LOG_NAME_MOTOR_1)
         lg.add_variable(self.LOG_NAME_MOTOR_2)
         lg.add_variable(self.LOG_NAME_MOTOR_3)
         lg.add_variable(self.LOG_NAME_MOTOR_4)
-        lg.add_variable(self.LOG_NAME_CAN_FLY)
 
         try:
             self.cf.log.add_config(lg)
@@ -342,7 +345,7 @@ class CrazyflieLibWrapper:
         time.sleep(0.1)
 
         # acc sensor
-        lg = LogConfig("AccSensor", 150)
+        lg = LogConfig("AccSensor", 130)
         lg.add_variable(self.LOG_NAME_ACC_X, "float")
         lg.add_variable(self.LOG_NAME_ACC_Y, "float")
         lg.add_variable(self.LOG_NAME_ACC_Z, "float")
@@ -384,31 +387,31 @@ class CrazyflieLibWrapper:
         self.cf.close_link()
         logger.debug(("disconnect url:%s" % self.link_url))
 
-    def set_param(self, name, value):
-        global send_queue
-        try:
-            self.cf.param.set_value(name, value)
-        except Exception as e:
-            msg = {'cmd': CmdEnum.UNKNOWN, 'data': value, 'status': 1}
-            send_queue.put_nowait(msg)
-            logger.error('set_param error:{0}'.format(e))
-
-
 def udpSendhandle(udp_socket, crazyflie, pc_address):
     global send_queue
     global is_quit
-    msg = None
+    recount = 0
     while not is_quit:
         try:
-            msg = send_queue.get(block=True, timeout=20)
+            msg = send_queue.get(block=True, timeout=10)
         except BaseException as e:
-            msg = None
             if crazyflie.uiState == UIState.CONNECTED or crazyflie.uiState == UIState.CONNECTING:
-                logger.debug('disconnect:{0}'.format(e))
-                crazyflie.connectState = ConnectionState.SOCKET_BLOCK
-                crazyflie.disconnect()
+                logger.debug('socket block disconnect:{0}'.format(e))
+                recount += 1
+                if recount % 3 == 0:
+                    crazyflie.connectState = ConnectionState.CONNECT_ERROR
+                    crazyflie.disconnect()
+                else:
+                    crazyflie.connectState = ConnectionState.SOCKET_BLOCK
+                    crazyflie.disconnect()
+                    time.sleep(1)
+
+                if crazyflie.connectState == ConnectionState.SOCKET_BLOCK and not is_quit:
+                    crazyflie.connect()
+            continue
 
         if msg:
+            recount = 0
             # if msg['cmd'] == CmdEnum.DISCONNECT or msg['cmd'] == CmdEnum.CONNECT:
             #    logger.debug('send msg:{0}'.format(msg))
             json_data = json.dumps(msg)
@@ -461,10 +464,8 @@ def udpReceivehandle(udp_socket, crazyflie):
             crazyflie.connectState = ConnectionState.MANU_DISCONNECT
             crazyflie.disconnect()
             time.sleep(0.1)
-            msg = {'cmd': CmdEnum.QUIT, 'data': [0], 'status': 0}
-            send_queue.put_nowait(msg)
-            time.sleep(0.1)
             is_quit = True
+            break
         elif cmd == CmdEnum.DISCONNECT:
             crazyflie.connectState = ConnectionState.MANU_DISCONNECT
             crazyflie.disconnect()
@@ -487,7 +488,6 @@ if __name__ == "__main__":
     udp_address = ('127.0.0.1', 59494)
     pc_address = ('127.0.0.1', 59191)
     udp_socket = socket(AF_INET, SOCK_DGRAM)
-    udp_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     udp_socket.bind(udp_address)
 
     crazyflie = CrazyflieLibWrapper()
@@ -495,9 +495,7 @@ if __name__ == "__main__":
     t1 = threading.Thread(target=udpReceivehandle, args=(udp_socket, crazyflie))
     t2 = threading.Thread(target=udpSendhandle, args=(udp_socket, crazyflie, pc_address))
 
-    thread_list = []
-    thread_list.append(t1)
-    thread_list.append(t2)
+    thread_list = [t1, t2]
 
     for t in thread_list:
         t.start()

@@ -105,7 +105,7 @@ class UdpDriver(CRTPDriver):
         self._thread = None
         self.addr = None
         self.socket = None
-        self.debug = True
+        self.debug = False
         self.link_error_callback = Caller()
         self.link_quality_callback = Caller()
         self.needs_resending = True
@@ -122,7 +122,6 @@ class UdpDriver(CRTPDriver):
         self.addr = (uri.split('udp://')[1], 2390)  # The destination IP and port '192.168.43.42'
         self.socket.bind(('', 2399))
         self.socket.connect(self.addr)
-        self.socket.sendto('\xFF\x01\x01\x01'.encode(), self.addr)
         is_connected = True
         self._thread = threading.Thread(target=_send_packet, args=(self.socket, self.addr))
         self._thread.start()
@@ -190,9 +189,9 @@ class UdpDriver(CRTPDriver):
 
     def close(self):
         global is_connected
-        global keep_live_queue
-        msg = b'\xFF\x01\x02\x02'
-        keep_live_queue.put_nowait(msg)
+        #  global keep_live_queue
+        #  msg = b'\xFF\x01\x02\x02'
+        #  keep_live_queue.put_nowait(msg)
         is_connected = False
         # Remove this from the server clients list
         self._thread.join(1)

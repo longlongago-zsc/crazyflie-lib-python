@@ -93,7 +93,7 @@ GET_TOC_ELEMENT = 'GET_TOC_ELEMENT'
 
 # 1、创建一个logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
 
 # 2、创建一个handler，用于写入日志文件
 try:
